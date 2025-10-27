@@ -2,21 +2,30 @@ Modern cloud services such as web search, e-commerce, and serverless computing o
 Meeting both mean and tail end-to-end latency SLOs are critical for service providers, not only for maximizing service throughput but also for ensuring a responsive user experience.
 Achieving these latency SLOs depends on \textit{how compute resources are scheduled to jobs} within each server, particularly under high load and job size variability.
 
-Many existing works \cite{prekas2017zygos,kaffes2019shinjuku,fried2020caladan,demoulin2021idling,iyer2023achieving,lin2024fast} demonstrate the necessity of preemptive scheduling to meet latency SLOs under both light- and heavy-tailed job size distributions.
-One widely adopted scheduling policy is Processor Sharing (PS) \cite{wierman2012tail}.
-PS allocates equal service capacity to all runnable jobs, reducing head-of-line blocking for short jobs with the presence of long-running jobs.
-Recent systems improve fine-grained preemption via inter-processor interrupts \cite{prekas2017zygos,kaffes2019shinjuku,fried2020caladan}, cache-coherent notifications \cite{iyer2023achieving}, and user-level interrupt mechanisms \cite{lin2024fast}.
+Prior works \cite{prekas2017zygos,kaffes2019shinjuku} demonstrate the necessity of preemptive scheduling and many works \cite{demoulin2021idling,iyer2023achieving,lin2024fast} follow the trail of optimizing preemption mechanisms to achieve microsecond-scale preemption latency.
+% One widely adopted scheduling policy is Processor Sharing (PS) \cite{wierman2012tail}.
+% PS allocates equal service capacity to all runnable jobs, reducing head-of-line blocking for short jobs with the presence of long-running jobs.
+% Recent systems improve fine-grained preemption via inter-processor interrupts \cite{prekas2017zygos,kaffes2019shinjuku,fried2020caladan}, cache-coherent notifications \cite{iyer2023achieving}, and user-level interrupt mechanisms \cite{lin2024fast}.
 
-However, we argue it is time to rethink not just \textit{how} preemption is implemented, but \textit{which} preemptive scheduling policy to use.
-Despite its theoretical appeal, Processor Sharing faces several limitations in practice.
-First, PS is approximated through fixed time slicing, also known as \textit{time quantum}: large quantum delays short tasks, while small quantum incurs more frequent preemption and thus higher context switching overhead.
-Second, PS is memoryless: it treats all jobs equally regardless of their size, age, or estimated remaining service time.
-As a result, long-running jobs may linger in the system for extended periods, delaying newer or shorter jobs and ultimately degrading mean and tail latencies.
+However, we believe it is time to rethink not just \textit{how} preemption is implemented, but \textit{which} preemptive scheduling policy to use.
+Preemptive policies can be categorized into two classes: \textit{age-based} and \textit{size-based}.
+The former prioritizes jobs based on their age (i.e., time spent in the system), while the latter uses job size (i.e., total service time required) or estimated remaining service time to make scheduling decisions.
+Age-based policies, such as Processor Sharing (PS) \cite{} and Least Attained Service (LAS) \cite{}, are appealing due to their simplicity and robustness to unknown job sizes.
+Size-based policies, such as Shortest Remaining Processing Time (SRPT) \cite{} and Gittins index \cite{}, can achieve optimal or near-optimal mean response times when job sizes are known or can be accurately estimated.
+The key distinction between these two classes lies in \textit{when preemption is triggered}: age-based policies typically operate on fixed time slices or aging thresholds, while size-based policies preempt only when there is a change in job priorities.
 
-We believe that scheduling should be guided by expected benefit, prioritizing tasks based on dynamic reward rather than static time-sharing.
-Our approach draws inspiration from the Gittins index \cite{scully2020gittins}, a near-optimal policy for minimizing mean response time ((i.e., queuing + service time)) in $M/G/k$ systems with unknown job sizes.
-We adapt this strategy to improve both mean and tail end-to-end latency across light- and heavy-tailed job size distributions.
-Unlike fixed-interval preemption, our scheduler defers preemption until a job's priority falls below that of another, avoiding unnecessary context switches.
+Prior works \cite{kaffes2019shinjuku} embrace age-based scheduling, in particular, Processor Sharing.
+Despite its theoretical appeal, PS faces several limitations in practice.
+First, PS is approximated through fixed time slicing, also known as \textit{time quantum}.
+The choice of time quantum determines the benefit of PS: large quantum delays short tasks, while small quantum incurs more frequent preemption and thus higher context switching overhead.
 
-We present \sysname, a single-address-space operating system that implements dynamic, reward-based scheduling with microsecond-scale preemption granularity.
+% Second, PS is memoryless: it treats all jobs equally regardless of their size, age, or estimated remaining service time.
+% As a result, long-running jobs may linger in the system for extended periods, delaying newer or shorter jobs and ultimately degrading mean and tail latencies.
+
+% We believe that scheduling should be guided by expected benefit, prioritizing tasks based on dynamic reward rather than static time-sharing.
+% Our approach draws inspiration from the Gittins index \cite{scully2020gittins}, a near-optimal policy for minimizing mean response time ((i.e., queuing + service time)) in $M/G/k$ systems with unknown job sizes.
+% We adapt this strategy to improve both mean and tail end-to-end latency across light- and heavy-tailed job size distributions.
+% Unlike fixed-interval preemption, our scheduler defers preemption until a job's priority falls below that of another, avoiding unnecessary context switches.
+
+% We present \sysname, a single-address-space operating system that implements dynamic, reward-based scheduling with microsecond-scale preemption granularity.
 % Cygnus breaks from threshold-based PS-inspired designs and instead prioritizes jobs based on their expected benefit.
