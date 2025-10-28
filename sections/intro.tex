@@ -1,31 +1,32 @@
-Modern cloud services such as web search, e-commerce, and serverless computing operate under stringent microsecond-scale latency service level objectives (SLOs) \cite{barroso2017attack,kaffes2019shinjuku,marty2019snap,zhang2021demikernel,iyer2023achieving}.
-Meeting both mean and tail end-to-end latency SLOs are critical for service providers, not only for maximizing service throughput but also for ensuring a responsive user experience.
-Achieving these latency SLOs depends on \textit{how compute resources are scheduled to jobs} within each server, particularly under high load and job size variability.
+Modern cloud services, including web search, online retail, and serverless platforms, operate under microsecond-scale latency Service Level Objectives (SLOs) \cite{barroso2017attack,kaffes2019shinjuku,marty2019snap,zhang2021demikernel,iyer2023achieving}.
+Meeting these SLOs critically depends on how compute resources are scheduled, especially under high load and job size variability.
+Ineffective scheduling inflates both mean and tail latency, reducing service throughput and degrading the responsiveness of user-facing applications.
 
-Prior works \cite{prekas2017zygos,kaffes2019shinjuku} demonstrate the necessity of preemptive scheduling and many works \cite{demoulin2021idling,iyer2023achieving,lin2024fast} follow the trail of optimizing preemption mechanisms to achieve microsecond-scale preemption latency.
-% One widely adopted scheduling policy is Processor Sharing (PS) \cite{wierman2012tail}.
-% PS allocates equal service capacity to all runnable jobs, reducing head-of-line blocking for short jobs with the presence of long-running jobs.
-% Recent systems improve fine-grained preemption via inter-processor interrupts \cite{prekas2017zygos,kaffes2019shinjuku,fried2020caladan}, cache-coherent notifications \cite{iyer2023achieving}, and user-level interrupt mechanisms \cite{lin2024fast}.
+Prior studies \cite{prekas2017zygos,kaffes2019shinjuku} demonstrate that preemptive scheduling is essential for meeting the latency SLOs of modern cloud services.
+Subsequent works further focus on reducing preemption latency to the microsecond scale.
+For example, ZygOS \cite{prekas2017zygos}, Shinjuku \cite{kaffes2019shinjuku}, and Caladan \cite{fried2020caladan} use inter-processor interrupts (IPIs) to achieve preemption latencies of 5-10 µs. Concord \cite{iyer2023achieving} uses cache-coherent notifications to reduce latency to 1-2 µs, while Vessel \cite{lin2024fast} employs user-level interrupts to further lower preemption latency to sub-microsecond levels.
+\yihan{to be verified}
 
-However, we believe it is time to rethink not just \textit{how} preemption is implemented, but \textit{which} preemptive scheduling policy to use.
-Preemptive policies can be categorized into two classes: \textit{age-based} and \textit{size-based}.
-The former prioritizes jobs based on their age (i.e., time spent in the system), while the latter uses job size (i.e., total service time required) or estimated remaining service time to make scheduling decisions.
-Age-based policies, such as Processor Sharing (PS) \cite{} and Least Attained Service (LAS) \cite{}, are appealing due to their simplicity and robustness to unknown job sizes.
-Size-based policies, such as Shortest Remaining Processing Time (SRPT) \cite{} and Gittins index \cite{}, can achieve optimal or near-optimal mean response times when job sizes are known or can be accurately estimated.
-The key distinction between these two classes lies in \textit{when preemption is triggered}: age-based policies typically operate on fixed time slices or aging thresholds, while size-based policies preempt only when there is a change in job priorities.
+However, beyond solely reducing preemption latency, it is time to reconsider \textit{which preemptive scheduling policy best serves latency-sensitive workloads}.
+Preemptive scheduling policies can be broadly classified into two categories: \textit{age-based} and \textit{size-based}.
+Age-based policies, such as Processor Sharing (PS) and Least Attained Service (LAS) \cite{}, prioritize jobs using only their service history.
+These policies are oblivious to job size and can be implemented efficiently using fixed-interval timer interrupts.
+Size-based policies, such as Shortest Remaining Processing Time (SRPT) \cite{} and the Gittins index policy \cite{}, schedule jobs based on known or estimated remaining service time.
+These policies provide optimal or near-optimal mean response time but require accurate job size estimation and dynamic priority management, which increases implementation complexity.
+These two classes are fundamentally different in \textit{when preemption is triggered}.
+Age-based policies are typically \textit{time-driven}, relying on fixed-length time slices (i.e., \textit{time quanta}) to trigger preemption. 
+In contrast, size-based policies are \textit{event-driven}, adjusting preemption points dynamically based on changes in job priority ranking.
 
-Prior works \cite{kaffes2019shinjuku} embrace age-based scheduling, in particular, Processor Sharing.
-Despite its theoretical appeal, PS faces several limitations in practice.
-First, PS is approximated through fixed time slicing, also known as \textit{time quantum}.
-The choice of time quantum determines the benefit of PS: large quantum delays short tasks, while small quantum incurs more frequent preemption and thus higher context switching overhead.
+Prior works \cite{kaffes2019shinjuku,iyer2023achieving,lin2024fast} adopt age-based scheduling due to its simplicity, because it can be implemented efficiently using fixed-length time quantum driven by periodic interrupts.
+However, age-based scheduling has two fundamental challenges.
+First, age-based preemption is approximated through fixed time slicing, also known as \textit{time quantum}.
+The time quantum introduces a trade-off: large quanta delay short jobs, while small quanta increase preemption frequency and context-switching overhead.
+Second, age-based policies are job-agnostic: they do not account for job size or remaining service time when making scheduling decisions.
+As a result, long jobs may occupy resources disproportionately, delaying short jobs and degrading both mean and tail latency.
 
-% Second, PS is memoryless: it treats all jobs equally regardless of their size, age, or estimated remaining service time.
-% As a result, long-running jobs may linger in the system for extended periods, delaying newer or shorter jobs and ultimately degrading mean and tail latencies.
+We believe that preemptive scheduling should be guided by the \textit{estimated future benefit} of serving each job, rather than retrospective metrics such as age.
+Our approach draws inspiration from $\gamma$-Boost \cite{}, a variant of the Gittins index that provides a near-optimal policy for minimizing mean response time (i.e., queuing + service time) and reducing tail latency with unknown job sizes.
 
-% We believe that scheduling should be guided by expected benefit, prioritizing tasks based on dynamic reward rather than static time-sharing.
-% Our approach draws inspiration from the Gittins index \cite{scully2020gittins}, a near-optimal policy for minimizing mean response time ((i.e., queuing + service time)) in $M/G/k$ systems with unknown job sizes.
-% We adapt this strategy to improve both mean and tail end-to-end latency across light- and heavy-tailed job size distributions.
-% Unlike fixed-interval preemption, our scheduler defers preemption until a job's priority falls below that of another, avoiding unnecessary context switches.
-
-% We present \sysname, a single-address-space operating system that implements dynamic, reward-based scheduling with microsecond-scale preemption granularity.
-% Cygnus breaks from threshold-based PS-inspired designs and instead prioritizes jobs based on their expected benefit.
+We present \sysname, a single-address-space operating system that implements reward-based scheduling policy with a novel \textit{event-driven} preemption at microsecond-scale.
+Unlike prior systems that rely on fixed-interval timer interrupts to trigger preemption, \sysname proposes a proactive-reactive preemption model.
+In this model, each worker core proactively schedules its own preemption using a local timer via the APIC register, while also responding to reactive preemption from a centralized controller triggered by external events such as network packet arrivals.
