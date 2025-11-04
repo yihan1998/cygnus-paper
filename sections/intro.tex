@@ -17,10 +17,10 @@ These two classes are fundamentally different in \textit{when preemption is trig
 Age-based policies are typically \textit{time-driven}, relying on fixed-length time slices (i.e., \textit{time quanta}) to trigger preemption. 
 In contrast, size-based policies are \textit{event-driven}, adjusting preemption points dynamically based on changes in job priority ranking.
 
-Prior works \cite{kaffes2019shinjuku,iyer2023achieving,lin2024fast} adopt age-based scheduling due to its simplicity, because it can be implemented efficiently using fixed-length time quantum driven by periodic interrupts.
-However, age-based scheduling has two fundamental challenges.
-First, age-based preemption is approximated through fixed time slicing, also known as \textit{time quantum}.
-The time quantum introduces a trade-off: large quanta delay short jobs, while small quanta increase preemption frequency and context-switching overhead.
+Prior works \cite{kaffes2019shinjuku,iyer2023achieving,lin2024fast} adopt age-based scheduling policies like PS as the default policy.
+However, age-based policies have two fundamental limitations.
+First, age-based policies in practice are often approximated with time-sliced preemption using fixed-interval timer interrupts.
+The choice of time slice introduces a trade-off: large quanta delay short jobs, while small quanta increase preemption frequency and context-switching overhead.
 Second, age-based policies are job-agnostic: they do not account for job size or remaining service time when making scheduling decisions.
 As a result, long jobs may occupy resources disproportionately, delaying short jobs and degrading both mean and tail latency.
 
