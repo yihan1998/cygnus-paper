@@ -110,6 +110,7 @@
 \usepackage{graphicx} 
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{cleveref}
 
 \newcommand{\sysname}{Cygnus\xspace}
 \newcommand{\yihan}[1]{\textcolor{orange}{yihan:#1}}
@@ -221,12 +222,15 @@
 \maketitle
 
 \section{Introduction}
+\label{sec:intro}
 \input{sections/intro.tex}
 
 \section{Background and Motivation}
+\label{sec:background}
 \input{sections/background.tex}
 
 \section{\sysname Design}
+\label{sec:design}
 \input{sections/design.tex}
 
 % ACM's consolidated article template, introduced in 2017, provides a

@@ -1,17 +1,42 @@
 Modern cloud services, including web search, online retail, and serverless platforms, operate under microsecond-scale latency Service Level Objectives (SLOs) \cite{barroso2017attack,kaffes2019shinjuku,marty2019snap,zhang2021demikernel,iyer2023achieving}.
+With every user request fanned out across thousands of servers, the end-to-end response time is determined by the slowest server.
+Bounding tail latency at individual server is therefore critical to obtain satisfiable user experience.
+As latency SLOs tighten into the microsecond regime, traditional monolithic operating systems (OSes) that are designed for general purpose struggle to provide predictable tail latency due to high overheads and variability induced by kernel mediation \cite{meng2017towards,kaffes2019shinjuku,iyer2023achieving}.
+In response, prior work has proposed lightweight dataplane OS approach to bypass the kernel I/O path.
+% approaches such as kernel bypass, lightweight virtualization, and dataplane operating systems to reduce OS-induced latency overheads.
 
-Prior works have demonstrated that preemptive scheduling is essential for meeting the latency SLOs of modern cloud services \cite{prekas2017zygos,kaffes2019shinjuku}.
-They have also proposed various implementation of implementing preemption in user space at microsecond-scale \cite{prekas2017zygos,kaffes2019shinjuku,fried2020caladan,iyer2023achieving,lin2024fast}.
+Beyond reducing OS overhead, recent research \cite{kaffes2019shinjuku,iyer2023achieving,lin2024fast} has shown that fine-grained preemptive scheduling is essential for meeting stringent tail latency requirements.
+In particular, processor sharing is critical to avoid head-of-line blocking, where short running tasks are delayed behind long running ones. 
+Several systems have proposed microsecond-scale preemption to implement processor sharing scheduling in userspace.
+Shinjuku leverages unicast Interprocessor Interrupts (IPIs) to implement fine-grained preemption for user-level threads \cite{kaffes2019shinjuku}.
+Concord further reduces preemption overhead by using cooperative preemption via cache-coherent message passing \cite{iyer2023achieving}.
+\yihan{Vessel? User interrupts?}
 
-However, existing works tactically embrace a centralized dispatching model for preemption issuing.
-While this model simplifies the design and implementation of preemptive scheduling, it also plant the seed of scalability as the number of cores growingly increases in Post Moore's Law era.
+However, most existing dataplane operating systems adopt a centralized dispatch model for issuing preemptions. 
+While centralized dispatch simplifies scheduling logic and enables global coordination, it introduces a scalability bottleneck as core counts continue to rise in modern many-core systems. 
+The centralized scheduler consequently faces a fundamental dilemma: 
+it must balance preemption precision against preemption issuing overhead.
+On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption issuing overhead that grows linearly with core count. 
+On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, head-of-line blocking, and potential SLO violations.
+To mitigate this dilemma, system could reserve additional cores solely for preemption issuing to guarantee preemption precision.
+This creates a compounded scalability challenge: preserving preemption precision both increases preemption issuing overhead and reduces resource efficiency.
 
-In this work, we address the scalability challenge with Cygnus, a new dataplane OS architecture.
-Our key insight is that modern processors already provide hardware primitives, i.e., Memory Protection Keys (MPK) and the Local Advanced Programmable Interrupt Controller (LAPIC), to enable decentralized preemption.
+In this work, we address the scalability dilemma with \sysname, a new dataplane OS architecture.
+Our key insight is that modern server processors have an innate distributed hardware feature that is capable of supporting fine-grained, per-core preemption decisions, namely the Local Advanced Programmable Interrupt Controller (LAPIC) timer, yet the access to these registers is traditionally restricted to privileged kernel code, in order to enforce strong system isolation for security concern.
+Therefore, \sysname is not inventing new hardware features, but rather rethinking OS architecture to safely expose these existing hardware components to untrusted user-level code.
 
-Cygnus achieves decentralized preemption by following an Exokernel philosophy:
-it exposes the timer subsystem directly to a per-core privileged \textit{Shadow Ring}, effectively a hardware-isolated Ring 1 component in userspace.
-Cygnus relies on three key mechanisms to implement the Shadow Ring.
-Firstly, Cygnus leverages MPK to isolate the Shadow Ring from untrusted applications running in Ring 3.
-Secondly, Cygnus utilizes the LAPIC timer as the source of preemption, allowing each core to independently schedule its own preemption events.
-Thirdly, Cygnus has Secure Upcall mechanism to securely transfer control from the application to the Shadow Ring upon preemption.
+\sysname follows an Exokernel design philosophy to selectively exposes low-level events to userspace.
+Specifically, \sysname introduces the Shadow Ring, a logically privileged execution context implemented entirely in Ring 3, but isolated from untrusted application code using Memory Protection Keys (MPK).
+The \sysname runtime in Ring 3 is split into two parts: 
+an untrusted libOS that manages application threads and runs alongside application code, and a trusted scheduler, which executes within the MPK-isolated Shadow Ring and interacts with kernel-controlled resources.
+Communication between trusted scheduler and hardware components is performed via a narrow secure interface, using downcalls for hardware configuration and upcalls for hardware event delivery.
+To configure system-critical hardware resources such as the LAPIC timer, the scheduler issues \textit{downcalls} via system calls (e.g., ioctl()) to trap into Ring 0 or maps control registers into the protected Shadow Ring via mmap.
+When a hardware event occurs such as a timer expiration, the kernel delivers it to the scheduler using an \textit{upcall}, which transfers control to a pre-registered handler in the Shadow Kernel.
+
+We compare \sysname with Shinjuku \cite{kaffes2019shinjuku} and Concord \cite{iyer2023achieving}, two state-of-the-art user-level preemptive scheduling systems at microsecond-scale.
+With synthetic workloads, ...
+With xx workloads on RocksDB, ...
+
+The rest of this paper is organized as follows.
+Section \cref{sec:background} motivates our work by discussing the scalability challenges of existing preemptive scheduling systems.
+Section \cref{sec:design} presents the design and implementation of \sysname.
