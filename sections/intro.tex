@@ -1,37 +1,55 @@
 Modern cloud services, including web search, online retail, and serverless platforms, operate under microsecond-scale latency Service Level Objectives (SLOs) \cite{barroso2017attack,kaffes2019shinjuku,marty2019snap,zhang2021demikernel,iyer2023achieving}.
 With every user request fanned out across thousands of servers, the end-to-end response time is determined by the slowest server.
-Bounding tail latency at individual server is therefore critical to obtain satisfiable user experience.
-% As latency SLOs tighten into the microsecond regime, traditional monolithic operating systems (OSes) that are designed for general purpose struggle to provide predictable tail latency due to high overheads and variability induced by kernel mediation.
-These stringent tail latency SLOs are tightening into the microsecond regime, \yihan{reason}
+Therefore, to ensure a satisfactory end-to-end responsiveness, bounding tail latency at each individual server is crucial.
+The stringent tail latency SLOs further tighten into microsecond regime by the widespread deployment of ultra-low latency hardware \yihan{cite} and the proliferation of microservice architectures \yihan{cite}.
 
-% Beyond reducing OS overhead with kernel bypassing, recent research has shown that scheduling policy is equally critical for meeting such stringent tail latency requirements.
-% Both queuing theory and existing research have proved that dataplane OSes need a hybrid of First-Come-First-Serve (FCFS) for light-tailed workloads and Preemptive Scheduling (PS) for heavy-tailed workloads to achieve optimal tail latency \cite{demoulin2021idling,iyer2023achieving}.
-% Unlike FCFS, which processes requests in the order of arrival, PS is challenging to implement in userspace due to \yihan{??}.
-% State-of-the-art dataplane OSes have explored various PS implementations.
-% Shinjuku leverages unicast Interprocessor Interrupts (IPIs) to implement fine-grained preemption for user-level threads \cite{kaffes2019shinjuku}.
-% Concord further reduces preemption overhead by using cooperative preemption via cache-coherent message passing \cite{iyer2023achieving}.
-To meet the stringent tail latency SLOs, existing research has shown that microsecond-scale schedulers not only need to minimize operating system overhead via kernel bypassing, but also require preemptive scheduling to cope with diverse workloads.
+Unfortunately, general-purpose operating systems (OSes) such as Linux struggle to meet these stringent tail latency SLOs due to high and unpredictable overheads in the kernel I/O stack and scheduler.
+To compensate, prior systems proposed \textit{kernel bypass} to obtain low and predictable latency on the datapath, hence introduces the concept of \textit{dataplane OS}.
+Dataplane OSes are able to directly access network devices in userspace and tailor a lightweight I/O stack for target workloads.
+Systems such as IX~\cite{belay2014ix} use hardware virtualization features like Intel VT-d~\cite{} to achieve protected, direct NIC queue access.
+Other systems such as Shenango~\cite{} and Persephone~\cite{} rely on high-performance user-space I/O libraries such as the Data Plane Development Kit (DPDK)~\cite{}.
+Dataplane OSes also implement user-level thread management to eliminate the unpredictable scheduling delays in kernel space.
+For instance, IX adopts a single-threaded, run-to-completion model, where the thread mitigates ring privilege switching overhead via adaptive batching.
+Systems such as Arachne~\cite{} and Shenango~\cite{} use cooperative multithreading, where user-level threads yield explicitly to the runtime.
 
-However, most existing dataplane operating systems implement preemptive scheduling using a centralized dispatch model, embedding a hidden scalability bottleneck.
-% While centralized dispatch simplifies scheduling logic and enables global coordination, it introduces a scalability bottleneck as core counts continue to rise in modern many-core systems. 
-% The centralized scheduler consequently faces a fundamental dilemma: 
-% it must balance preemption precision against preemption issuing overhead.
-% On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption issuing overhead that grows linearly with core count. 
-% On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, head-of-line blocking, and potential SLO violations.
-% To mitigate this dilemma, system could reserve additional cores solely for preemption issuing to guarantee preemption precision.
-% This creates a compounded scalability challenge: preserving preemption precision both increases preemption issuing overhead and reduces resource efficiency.
+Yet kernel bypassing alone is insufficient, as neither run-to-completion or cooperative scheduling can prevent head-of-line blocking in dataplane OS under the high-dispersion workloads common in cloud services.
+To compensate, dataplane OSes must implement \textit{preemptive scheduling} to approximate Processor Sharing (PS), which is theoretically optimal for heavy-tailed workloads.
+State-of-the-art dataplane OSes have explored various approaches to implement microsecond-scale preemptive scheduling.
+\yihan{For example, Shinjuku leverages unicast Interprocessor Interrupts (IPIs) to preempt tasks who have exhausted their 5$\mu$s timeslices.
+Concord further reduces preemption overhead by using cooperative preemption via cache-coherent message passing \cite{iyer2023achieving}.
+Signal?}
+
+However, most dataplane OSes rely on a \textit{centralized dispatcher} to issue preemptions, embedding a hidden scalability bottleneck as the number of cores continues to increase in modern multi-core servers. 
+The centralized preemption dispatcher faces a fundamental dilemma: 
+it must balance preemption precision against preemption issuing overhead.
+On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption issuing overhead that grows linearly with core count. 
+On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, and potential SLO violations.
+To mitigate this dilemma, the dataplane OS could reserve additional cores solely for preemption issuing to guarantee preemption precision.
+This creates a compounded scalability challenge: preserving preemption precision both increases preemption issuing overhead and reduces core efficiency.
 
 In this work, we address the scalability dilemma with \sysname, a new dataplane OS architecture.
-Our key insight is that modern server processors have an innate distributed hardware feature that is capable of supporting fine-grained, per-core preemption decisions, namely the Local Advanced Programmable Interrupt Controller (LAPIC) timer, yet the access to these registers is traditionally restricted to privileged kernel code, in order to enforce strong system isolation for security concern.
-Therefore, \sysname is not inventing new hardware features, but rather rethinking OS architecture to safely expose these existing hardware components to untrusted user-level code.
+Our key insight is that modern processors already include the necessary hardware for fine-grained, per-core preemption-namely, the Local Advanced Programmable Interrupt Controller (LAPIC) timer.
+However, the LAPIC timer is traditionally managed exclusively by the kernel to schedule kernel threads, making it inaccessible to userspace code.
+Thus, instead of introducing new hardware features, \sysname asks the following question:
+\textit{How to safely expose system-critical hardware resources like the LAPIC timer to the dataplane OS scheduler?}
 
-\sysname follows an Exokernel design philosophy to selectively exposes low-level events to userspace.
-Specifically, \sysname introduces the Shadow Ring, a logically privileged execution context implemented entirely in Ring 3, but isolated from untrusted application code using Memory Protection Keys (MPK).
-The \sysname runtime in Ring 3 is split into two parts: 
-an untrusted libOS that manages application threads and runs alongside application code, and a trusted scheduler, which executes within the MPK-isolated Shadow Ring and interacts with kernel-controlled resources.
-Communication between trusted scheduler and hardware components is performed via a narrow secure interface, using downcalls for hardware configuration and upcalls for hardware event delivery.
-To configure system-critical hardware resources such as the LAPIC timer, the scheduler issues \textit{downcalls} via system calls (e.g., ioctl()) to trap into Ring 0 or maps control registers into the protected Shadow Ring via mmap.
-When a hardware event occurs such as a timer expiration, the kernel delivers it to the scheduler using an \textit{upcall}, which transfers control to a pre-registered handler in the Shadow Kernel.
+To answer this, \sysname follows an Exokernel design philosophy: 
+system-critical hardware resources can be directly managed by the dataplane OS scheduler, but the privileged logic that manipulates these resources is strictly isolated from untrusted application code and other dataplane components.
+Specifically, \sysname introduces the \textit{Shadow Ring}, a logically privileged execution context implemented entirely in Ring 3.
+It uses Memory Protection Keys (MPK) to isolate the data and text segments of the trusted scheduler from untrusted context in a lightweight manner.
+The \sysname scheduler is therefore split into two parts:
+\begin{enumerate*}[label=(\alph*)]
+  \item an untrusted part that manages user-level threads and executes alongside application code, and
+  \item a trusted part (\schedcore), which runs within the MPK-isolated Shadow Ring and interacts directly with critical hardware resources.
+\end{enumerate*}
+
+Since system-critical hardware resources still require privileged access in modern operating systems, \sysname relies on a kernel module (\kmod) as a secure mediation layer between \schedcore and the underlying hardware.
+To configure a hardware resource, \schedcore can either 
+\begin{enumerate*}[label=(\arabic*)]
+  \item issue a \textit{downcall} via a system call (e.g., \texttt{ioctl()}) that traps into Ring 0, where \kmod completes hardware configuration, and
+  \item directly write to memory-mapped I/O (MMIO) regions of the hardware, which is mapped into a MPK-protected data segment in the Shadow Ring.
+\end{enumerate*}
+When a hardware event such as a timer expiration occurs, \kmod delivers it to the scheduler via an \textit{upcall}, transferring control to a registered handler located in the MPK-protected text segment in the Shadow Ring.
 
 We compare \sysname with Shinjuku~\cite{kaffes2019shinjuku}, Perséphone~\cite{demoulin2021idling} and Concord~\cite{iyer2023achieving}, three state-of-the-art dataplane operating systems.
 For synthetic workloads, we show that \yihan{xx}.
@@ -39,5 +57,6 @@ For YCSB workloads on RocksDB, a widely used key-value store, we show that \yiha
 We show that \sysname scales better than prior systems as core counts increase, while preserving microsecond-scale preemption precision.
 
 The rest of this paper is organized as follows.
-Section \cref{sec:background} motivates our work by discussing the scalability challenges of existing preemptive scheduling systems.
-Section \cref{sec:design} presents the design and implementation of \sysname.
+Section~\cref{sec:background} motivates our work by discussing the scalability challenges of existing preemptive scheduling systems.
+Section~\cref{sec:challenge} discusses the key challenges and design approaches of \sysname.
+Section~\cref{sec:design} presents the detailed design and implementation of \sysname.

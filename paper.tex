@@ -111,9 +111,13 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{cleveref}
+\usepackage[inline]{enumitem}
 
-\newcommand{\sysname}{\textsc{Cygnus}\xspace}
-\newcommand{\yihan}[1]{\textcolor{orange}{yihan:#1}}
+\newcommand{\sysname}{Cygnus\xspace}
+\newcommand{\libos}{\texttt{libCyg}\xspace}
+\newcommand{\schedcore}{\textsc{CygCore}\xspace}
+\newcommand{\kmod}{\textsc{KActiv}\xspace}
+\newcommand{\yihan}[1]{\textcolor{orange}{yihan:#1}\xspace}
 
 %%
 %% end of the preamble, start of the body of the document source.
@@ -228,6 +232,10 @@
 \section{Background and Motivation}
 \label{sec:background}
 \input{sections/background.tex}
+
+\section{Challenges and Approaches}
+\label{sec:challenge}
+\input{sections/challenge.tex}
 
 \section{\sysname Design}
 \label{sec:design}
