@@ -22,6 +22,26 @@ Prior works explore various techniques to implement these preemptive scheduling 
 
 \subsection{Scalability Dilemma of Centralized Preemption}
 
-\paragraph{Trade-off between preemption precision and overhead.}
+We now discuss the scalability challenges of existing preemption mechanisms that rely on a centralized dispatcher.
 
-\paragraph{Trade-off between preemption precision and core efficiency}
+Centralized preemption dispatcher implementation spectrum has two extremes:
+\begin{enumerate*}[label=(\roman*)]
+  \item \textit{Instant per-core preemption}, where the dispatcher issues preemptions to individual cores immediately to ensure precise preemption, and
+  \item \textit{Fixed-interval batch-all preemption}, where the dispatcher issues preemptions to all cores at fixed intervals to minimize preemption issuing overhead.
+\end{enumerate*}
+Intermediate designs can also issue preemptions to a subset of cores at a time, but their performance are bounded by the two extremes.
+
+We use an analytical model to illustrate the scalability dilemma of centralized preemption dispatchers.
+
+\paragraph{System setup}
+We consider a system with $n$ worker cores and preemption quantum $q$.
+We define \textit{preemption precision} as the inverse of the worst case difference between the ideal and actual preemption time for any worker core.
+
+\paragraph{Preemption precision and preemption overhead}
+Centralized dispatchers face a fundamental trade-off between preemption precision and preemption overhead.
+In the instant per-core preemption extreme, the dispatcher issues preemptions to each core immediately.
+This ensures high preemption precision of $O(1)$, but incurs preemption overhead of $O(n)$, since the dispatcher must issue preemptions to all $n$ cores individually.
+In contrast, in the fixed-interval batch-all preemption extreme, the dispatcher issues preemptions to all cores at fixed intervals.
+This minimizes preemption overhead to $O(1)$, but results in low preemption precision of $O(q)$, since a core may have to wait up to $q$ time before receiving a preemption.
+
+\paragraph{Preemption precision and core efficiency}

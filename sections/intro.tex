@@ -24,11 +24,11 @@ To this end, prior work on dataplane OS has explored various mechanisms for impl
 
 However, most dataplane OSes rely on a \textit{centralized dispatcher} to issue preemptions, embedding a hidden scalability bottleneck as the number of cores continues to increase in modern multi-core servers. 
 The centralized preemption dispatcher faces a fundamental dilemma: 
-it must balance preemption precision against preemption issuing overhead.
-On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption issuing overhead that grows linearly with core count. 
+it must balance preemption precision against preemption overhead.
+On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption overhead that grows linearly with core count. 
 On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, and potential SLO violations.
 To mitigate this dilemma, the dataplane OS could reserve additional cores solely for preemption issuing to guarantee preemption precision.
-This creates a compounded scalability challenge: preserving preemption precision both increases preemption issuing overhead and reduces core efficiency.
+This creates a compounded scalability challenge: preserving preemption precision both increases preemption overhead and reduces core efficiency.
 
 In this work, we address the scalability dilemma with \sysname, a new dataplane OS that enables distributed, microsecond-scale preemptive scheduling for multi-core servers.
 Our key insight is that modern processors already include the necessary hardware for fine-grained, per-core preemption—namely, the Local Advanced Programmable Interrupt Controller (LAPIC) timer.
