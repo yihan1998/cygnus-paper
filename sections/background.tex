@@ -1,24 +1,34 @@
-\subsection{Existing Preemptive Scheduling Approaches}
+\subsection{Existing Uses of Preemption in Dataplane OS}
 
 % State-of-the-art schedulers use preemptive scheduling for load balancing, core allocation, and latency control.
 
 % In particular, schedulers in dataplane OSes demand predictable and low-overhead preemptive scheduling to meet strict tail latency SLOs.
 
-State-of-the-art dataplane OS schedulers use preemptive scheduling to meet strict tail latency SLOs.
-The goal of preemptive scheduling is to avoid head-of-line blocking, which occurs when a long-running task monopolizes a core, causing latency-critical tasks to wait.
+% State-of-the-art dataplane OS schedulers use preemptive scheduling to meet strict tail latency SLOs.
+% The goal of preemption is to avoid head-of-line blocking, which occurs when a long-running task monopolizes a core, causing latency-critical tasks to wait.
 
-% Existing approaches can be broadly categorized into two classes:
+State-of-the-art dataplane OS schedulers use preemptive scheduling to reduce the impact of head-of-line blocking on tail latency.
 
-\paragraph{Off-path preemption}
-Scheduler uses preemption to adjust core allocation or balance application load across cores. 
-This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays.
+Preemption can appear on two different paths in the scheduling process:
 
-\paragraph{On-path preemption} 
+\paragraph{Resource-level}
+Scheduler balances load across cores or adjusts core allocation for applications. 
+This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays
+
+\paragraph{Task-level}
 Scheduler directly preempts running tasks on the latency-critical datapath.
 This aims to approximate Processor Sharing.
 
-Prior works explore various techniques to implement these preemptive scheduling approaches.
-\yihan{POSIX Signal, IPI, cache coherence. Compare overhead and cooperativeness?}
+% \paragraph{Off-path preemption}
+% Scheduler uses preemption to adjust core allocation or balance application load across cores. 
+% This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays.
+
+% \paragraph{On-path preemption} 
+% Scheduler directly preempts running tasks on the latency-critical datapath.
+% This aims to approximate Processor Sharing.
+
+% Prior works explore various techniques to implement these preemptive scheduling approaches.
+% \yihan{POSIX Signal, IPI, cache coherence. Compare overhead and cooperativeness?}
 
 \subsection{Scalability Dilemma of Centralized Preemption}
 
