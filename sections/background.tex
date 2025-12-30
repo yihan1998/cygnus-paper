@@ -16,6 +16,26 @@ This type of preemption requires precise timing to ensure latency-sensitive task
 Existing works explore various preemption mechanisms, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent message passing.
 \yihan{We compare the overhead of these mechanisms in table xx.}
 
+\begin{table*}[t]
+\centering
+\begin{tabular}{llllll}
+\toprule
+Preemption Site & System   & Model        & Mechanism       & Purpose                          & App Cooperation \\
+\midrule
+\multirow{3}{*}{Off-path} 
+                & Caladan  & Centralized  & Broadcast IPI   & Core allocation                  & Yes \\
+                & Vessel   & Centralized  & User interrupt  & Core sharing                     & No  \\
+                & ZygOS    & Distributed  & Unicast IPI     & Load balancing via work stealing & No  \\
+\midrule
+\multirow{2}{*}{On-path}  
+                & Shinjuku & Centralized  & Unicast IPI     & \multirow{2}{*}{Approximate Processor Sharing}      & No  \\
+                & Concord  & Centralized  & Cache polling   &     & Yes \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of user-level preemption mechanisms in modern dataplane OSes.}
+\label{tab:preemption-summary}
+\end{table*}
+
 \subsection{Scalability Dilemma of Centralized Preemption}
 
 We now discuss the scalability challenges of using a centralized preemption dispatcher to preempt remote worker cores.
