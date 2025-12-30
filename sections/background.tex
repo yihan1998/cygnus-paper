@@ -1,59 +1,46 @@
 \subsection{Existing Uses of Preemption in Dataplane OS}
 
-% State-of-the-art schedulers use preemptive scheduling for load balancing, core allocation, and latency control.
-
-% In particular, schedulers in dataplane OSes demand predictable and low-overhead preemptive scheduling to meet strict tail latency SLOs.
-
-% State-of-the-art dataplane OS schedulers use preemptive scheduling to meet strict tail latency SLOs.
-% The goal of preemption is to avoid head-of-line blocking, which occurs when a long-running task monopolizes a core, causing latency-critical tasks to wait.
-
 State-of-the-art dataplane OS schedulers use preemptive scheduling to reduce the impact of head-of-line blocking on tail latency.
+Preemption can appear on both control path and datapath.
 
-Preemption can appear on two different paths in the scheduling process:
-
-\paragraph{Resource-level}
+\paragraph{Control path preemption.}
 Scheduler balances load across cores or adjusts core allocation for applications. 
-This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays
+This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays.
+This type of preemption have more relaxed timing requirements since it does not directly affect latency-critical tasks.
 
-\paragraph{Task-level}
+\paragraph{Data path preemption.}
 Scheduler directly preempts running tasks on the latency-critical datapath.
 This aims to approximate Processor Sharing.
+This type of preemption requires precise timing to ensure latency-sensitive tasks receive timely execution and low overhead to avoid excessive disruption to the datapath.
 
-% \paragraph{Off-path preemption}
-% Scheduler uses preemption to adjust core allocation or balance application load across cores. 
-% This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays.
-
-% \paragraph{On-path preemption} 
-% Scheduler directly preempts running tasks on the latency-critical datapath.
-% This aims to approximate Processor Sharing.
-
-% Prior works explore various techniques to implement these preemptive scheduling approaches.
-% \yihan{POSIX Signal, IPI, cache coherence. Compare overhead and cooperativeness?}
+Existing works explore various preemption mechanisms, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent message passing.
+\yihan{We compare the overhead of these mechanisms in table xx.}
 
 \subsection{Scalability Dilemma of Centralized Preemption}
 
-We now discuss the scalability challenges of existing preemption mechanisms that rely on a centralized dispatcher.
+We now discuss the scalability challenges of using a centralized preemption dispatcher to preempt remote worker cores.
 
 Centralized preemption dispatcher implementation spectrum has two extremes:
 \begin{enumerate*}[label=(\roman*)]
-  \item \textit{Instant per-core preemption}, where the dispatcher issues preemptions to individual cores immediately to ensure precise preemption, and
-  \item \textit{Fixed-interval batch-all preemption}, where the dispatcher issues preemptions to all cores at fixed intervals to minimize preemption issuing overhead.
+  \item \textit{Per-core preemption}, where the dispatcher issues preemptions to individual cores immediately to ensure precise preemption, and
+  \item \textit{Batch-all preemption}, where the dispatcher issues preemptions to all cores at fixed intervals to minimize preemption issuing overhead.
 \end{enumerate*}
-Intermediate designs can also issue preemptions to a subset of cores at a time, but their performance are bounded by the two extremes.
+\yihan{Explain why intermediate designs are bounded by these two}
 
 We use an analytical model to illustrate the scalability dilemma of centralized preemption dispatchers.
 
 \paragraph{System setup}
 We consider a system with $n$ worker cores and preemption quantum $q$.
-We define \textit{preemption precision} as the inverse of the worst case difference between the ideal and actual preemption time for any worker core.
+We define \textit{preemption drift} $\delta_i$ as the difference between the ideal preemption time (preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
+The worst-case preemption drift across all cores is defined as $\Delta = \max_{i=1}^{n} \delta_i$.
 
-\paragraph{Preemption precision and preemption overhead}
-Centralized dispatchers face a fundamental trade-off between preemption precision and preemption overhead.
-In the instant per-core preemption extreme, the dispatcher issues preemptions to each core immediately.
-This ensures high preemption precision of $O(1)$, but incurs preemption overhead of $O(n)$, since the dispatcher must issue preemptions to all $n$ cores individually.
-In contrast, in the fixed-interval batch-all preemption extreme, the dispatcher issues preemptions to all cores at fixed intervals.
-This minimizes preemption overhead to $O(1)$, but results in low preemption precision of $O(q)$, since a core may have to wait up to $q$ time before receiving a preemption.
+% \paragraph{Preemption precision and preemption overhead}
+% Centralized dispatchers face a fundamental trade-off between preemption precision and preemption overhead.
+% In the instant per-core preemption extreme, the dispatcher issues preemptions to each core immediately.
+% This ensures high preemption precision of $O(1)$, but incurs preemption overhead of $O(n)$, since the dispatcher must issue preemptions to all $n$ cores individually.
+% In contrast, in the fixed-interval batch-all preemption extreme, the dispatcher issues preemptions to all cores at fixed intervals.
+% This minimizes preemption overhead to $O(1)$, but results in low preemption precision of $O(q)$, since a core may have to wait up to $q$ time before receiving a preemption.
 
-\paragraph{Preemption precision and core efficiency}
+% \paragraph{Preemption precision and core efficiency}
 
 \subsection{Hardware Isolation}

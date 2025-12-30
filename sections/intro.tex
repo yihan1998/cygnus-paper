@@ -17,18 +17,24 @@ In contrast, Shenango and Arachne~\cite{} use cooperative multithreading, where 
 Yet kernel bypassing alone is insufficient, as neither run-to-completion nor cooperative scheduling can prevent head-of-line (HoL) blocking under the high-dispersion workloads common in cloud services.
 In such scenarios, a long-running task can monopolize a core, delaying the execution of short, latency-sensitive tasks and severely inflating tail latency.
 To avoid violating tail latency SLOs, dataplane OSes must support \textit{preemptive scheduling}, allowing latency-critical tasks to receive timely execution.
-To this end, prior work on dataplane OS has explored various mechanisms for implementing preemptive scheduling in userspace.
+
+Prior work on dataplane OS has explored various mechanisms for implementing preemptive scheduling in userspace.
 % \yihan{For example, Shinjuku leverages unicast Interprocessor Interrupts (IPIs) to preempt tasks who have exhausted their 5$\mu$s timeslices.
 % Concord further reduces preemption overhead by using cooperative preemption via cache-coherent message passing \cite{iyer2023achieving}.
 % Signal?}
 
-However, most dataplane OSes rely on a \textit{centralized dispatcher} to issue preemptions, embedding a hidden scalability bottleneck as the number of cores continues to increase in modern multi-core servers. 
-The centralized preemption dispatcher faces a fundamental dilemma: 
-it must balance preemption precision against preemption overhead.
-On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption overhead that grows linearly with core count. 
-On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, and potential SLO violations.
-To mitigate this dilemma, the dataplane OS could reserve additional cores solely for preemption issuing to guarantee preemption precision.
-This creates a compounded scalability challenge: preserving preemption precision both increases preemption overhead and reduces core efficiency.
+However, existing dataplane OSes typically rely on a \textit{centralized dispatcher} to preempt remote worker cores.
+As core counts grow in modern servers, the cost of initiating these preemptions through a centralized dispatcher increases proportionally, creating a fundamental scalability bottleneck.
+The system must then trade off preemption responsiveness against resource efficiency:
+it can either reduce preemption frequency, increasing the risk of tail latency SLO violations, or dedicate more cores to dispatching, reducing resources available to applications.
+% As core counts in modern servers continue to increase, the centralized preemption dispatcher faces a fundamental scalability dilemma:
+% the cost of issuing preemptions grows with the number of cores, eventually forcing the system to choose between sacrificing preemption granularity or dedicating more cores to maintain precision.
+% This hidden scalability bottleneck limits the effectiveness of preemptive scheduling in large multi-core servers.
+% it must balance preemption precision against preemption overhead.
+% On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption overhead that grows linearly with core count. 
+% On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, and potential SLO violations.
+% To mitigate this dilemma, the dataplane OS could reserve additional cores solely for preemption issuing to guarantee preemption precision.
+% This creates a compounded scalability challenge: preserving preemption precision both increases preemption overhead and reduces core efficiency.
 
 In this work, we address the scalability dilemma with \sysname, a new dataplane OS that enables distributed, microsecond-scale preemptive scheduling for multi-core servers.
 Our key insight is that modern processors already include the necessary hardware for fine-grained, per-core preemption—namely, the Local Advanced Programmable Interrupt Controller (LAPIC) timer.
