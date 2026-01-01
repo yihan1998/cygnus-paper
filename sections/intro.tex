@@ -24,8 +24,8 @@ Prior work on dataplane OS has explored various mechanisms for implementing pree
 % Signal?}
 
 However, existing dataplane OSes typically rely on a \textit{centralized dispatcher} to preempt remote worker cores.
-As core counts grow in modern servers, the cost of initiating these preemptions through a centralized dispatcher increases proportionally, creating a fundamental scalability bottleneck.
-The system must then trade off preemption responsiveness against resource efficiency:
+As core counts grow in modern servers, the cost of issuing these preemptions through a centralized dispatcher increases proportionally, creating a fundamental scalability bottleneck.
+The system must then trade off preemption precision against resource efficiency:
 it can either reduce preemption frequency, increasing the risk of tail latency SLO violations, or dedicate more cores to dispatching, reducing resources available to applications.
 % As core counts in modern servers continue to increase, the centralized preemption dispatcher faces a fundamental scalability dilemma:
 % the cost of issuing preemptions grows with the number of cores, eventually forcing the system to choose between sacrificing preemption granularity or dedicating more cores to maintain precision.
@@ -65,6 +65,6 @@ For YCSB workloads on RocksDB, a widely used key-value store, we show that \yiha
 We show that \sysname scales better than prior systems as core counts increase, while preserving microsecond-scale preemption precision.
 
 The rest of this paper is organized as follows.
-Section~\cref{sec:background} motivates our work by discussing the scalability challenges of existing preemptive scheduling systems.
-Section~\cref{sec:challenge} discusses the key challenges and design approaches of \sysname.
-Section~\cref{sec:design} presents the detailed design and implementation of \sysname.
+\cref{sec:background} motivates our work by discussing the scalability challenges of existing preemptive scheduling systems.
+\cref{sec:challenge} discusses the key challenges and design approaches of \sysname.
+\cref{sec:design} presents the detailed design and implementation of \sysname.
