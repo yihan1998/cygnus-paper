@@ -23,6 +23,22 @@ Existing works explore various preemption mechanisms, including POSIX signals, I
 
 \yihan{We compare the overhead of these mechanisms in table xx.}
 
+\begin{table*}[t]
+\centering
+\begin{tabular}{ccccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Trigger Path}} & \multirow{2}{*}{\textbf{System}} & \multicolumn{5}{c}{\textbf{Preemption}}                                                                                         & \multicolumn{2}{c}{\textbf{Isolation}}           \\
+                                       &                                  & Topology    & Driven by                 & Mechanism       & Purpose                                           & App Cooperation & Scheduler ↔ App          & Between Apps          \\
+\multirow{3}{*}{Control-path}          & ZygOS                            & Distributed & \multirow{5}{*}{Software} & Unicase IPI     & Load balancing by work stealing from remote cores & no              & Ring 0 (non-root)↔Ring 3 & Strong (Kernel)       \\
+                                       & Caladan                          & Centralized &                           & Multicast IPI   & Core sharing between kernel processes             & yes             & Userspace                & Strong (Kernel)       \\
+                                       & Vessel                           & Centralized &                           & User interrupt  & Core sharing between lightweight user processes   & no              & Userspace (MPK-isolated) & Weak (shared runtime) \\
+\multirow{3}{*}{Datapath}              & Shinjuku                         & Centralized &                           & Unicase IPI     & Preempt long running tasks                        & no              & Userspace                & -                     \\
+                                       & Concord                          & Centralized &                           & Cache coherency & Preempt long running tasks                        & yes             & Userspace                & -                     \\
+                                       & Cygnus                           & Distributed & Hardware                  & LAPIC timer     & Preempt long running tasks                        & no              & Userspace (MPK-isolated) & Strong (Kernel)       \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
 % \begin{table*}[t]
 % \centering
 % \begin{tabular}{llllll}
