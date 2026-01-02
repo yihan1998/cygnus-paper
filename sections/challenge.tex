@@ -1,5 +1,7 @@
-\paragraph{C\#1:}
-\paragraph{C\#2:}
+Our goal is to design a dataplane OS that can perform scalable, microsecond-scale preemptive scheduling on modern multi-core servers.
+To achieve this, we need to multiplex kernel-critical hardware resources like the LAPIC timer to a userspace scheduler without compromising system safety.
+We need to address two key challenges:
+\paragraph{Safe exposure of raw hardware interfaces}
+\paragraph{Fast hardware configuration and secure event delivery}
 
-\paragraph{D\#1:}
-\paragraph{D\#2:}
+\subsection{\sysname Approach}

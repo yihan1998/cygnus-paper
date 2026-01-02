@@ -1,38 +1,18 @@
-We first profile the overhead of various user-level preemption mechanisms used in existingdataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent message passing (\S~\ref{subsec:preemption-in-dataplane-os}).
-Based on these measurements, we use an analytical model to illustrate the scalability dilemma of using a centralized dispatcher to preempt remote worker cores (\S~\ref{subsec:scalability-dilemma}).
+% We first profile the overhead of various user-level preemption mechanisms used in existingdataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent message passing (\S~\ref{subsec:preemption-in-dataplane-os}).
+% Based on these measurements, we use an analytical model to illustrate the scalability dilemma of using a centralized dispatcher to preempt remote worker cores (\S~\ref{subsec:scalability-dilemma}).
 
-\subsection{Preemption in Dataplane OS}
-\label{subsec:preemption-in-dataplane-os}
-
-State-of-the-art dataplane OS schedulers use preemptive scheduling to reduce the impact of head-of-line blocking on tail latency.
-We categorize existing preemption mechanisms based on the path it occurs on in the system, purpose of preemption, whether it requires application cooperation.
-
-Preemption can appear on both control path and datapath.
-
-\paragraph{Control path preemption}
-Scheduler balances load across cores or adjusts core allocation for applications. 
-This aims to maintain low core utilization to indirectly avoid head-of-line blocking and reduce queuing delays.
-This type of preemption have more relaxed timing requirements since it does not directly affect latency-critical tasks.
-
-\paragraph{Data path preemption}
-Scheduler directly preempts running tasks on the latency-critical datapath.
-This aims to approximate Processor Sharing.
-This type of preemption requires precise timing to ensure latency-sensitive tasks receive timely execution and low overhead to avoid excessive disruption to the datapath.
-
-Existing works explore various preemption mechanisms, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent message passing.
-
-\yihan{We compare the overhead of these mechanisms in table xx.}
+In this section, we categorize existing dataplane OSes based on their preemption models (\S~\ref{subsec:existing-preemption-models}) and isolation models (\S~\ref{subsec:existing-isolation-models}) in table \ref{tab:comparison}.
 
 \begin{table*}[t]
 \centering
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}ll c M{3cm} M{5cm} c M{4.7cm} M{2.6cm}@{}}
+\begin{tabular}{@{}l c c M{3cm} M{5cm} c M{4.7cm} M{2.6cm}@{}}
 \toprule
-\multirow{2}{*}{\textbf{Trigger Path}} & \multirow{2}{*}{\textbf{System}} 
-& \multicolumn{4}{c}{\textbf{Preemption}} 
+\multirow{2}{*}{\textbf{System}} 
+& \multicolumn{5}{c}{\textbf{Preemption}} 
 & \multicolumn{2}{c}{\textbf{Isolation}} \\ 
-\cmidrule(lr){3-6} \cmidrule(l){7-8}
- & 
+\cmidrule(lr){2-6} \cmidrule(l){7-8}
+ & \textbf{Triggered Path}
  & \textbf{Topology} 
  & \textbf{Mechanism} 
  & \textbf{Purpose} 
@@ -41,16 +21,17 @@ Existing works explore various preemption mechanisms, including POSIX signals, I
  & \textbf{Between Apps} \\ 
 \midrule
 
-\multirow{3}{*}{Control-path} 
-& ZygOS~\cite{prekas2017zygos} 
+ZygOS~\cite{prekas2017zygos} 
+& Control path
 & Distributed 
 & Unicast IPI (Software) 
 & Load balancing by enabling work stealing from busy remote cores 
 & \ding{55} 
-& Ring 3 $\leftrightarrow$ Ring 0 
+& Ring 3 $\leftrightarrow$ Ring 0 (non-root)
 & Strong (Kernel Process) \\
 
-& Caladan~\cite{fried2020caladan} 
+Caladan~\cite{fried2020caladan} 
+& Control path
 & Centralized 
 & Multicast IPI (Software) 
 & Dynamic core adjustment to mitigate interference between latency-critical and best-effort applications 
@@ -58,31 +39,33 @@ Existing works explore various preemption mechanisms, including POSIX signals, I
 & None (Shared address space) 
 & Strong (Kernel Process) \\
 
-& Vessel~\cite{lin2024fast} 
+Vessel~\cite{lin2024fast} 
+& Control path
 & Centralized 
 & User interrupt (Software) 
 & Latency-aware core sharing between user processes in the shared memory address space 
 & \ding{55} 
 & Single-key region (non-privileged) $\leftrightarrow$ All-access region (privileged) 
 & Weak (MPK-isolated pages) \\ 
-\midrule
 
-\multirow{3}{*}{Datapath} 
-& Shinjuku~\cite{kaffes2019shinjuku} 
+Shinjuku~\cite{kaffes2019shinjuku} 
+& Datapath
 & Centralized 
 & Unicast IPI (Software) 
 & Approximate Processor Sharing (PS) to minimize tail latency 
 & \ding{55} 
 & \multicolumn{2}{c}{None (Shared address space)} \\
 
-& Concord~\cite{iyer2023achieving} 
+Concord~\cite{iyer2023achieving} 
+& Datapath
 & Centralized 
 & Cache-coherent messaging (Software) 
 & Approximate PS via cooperative preemption to improve throughput 
 & \ding{51} 
 & \multicolumn{2}{c}{None (Shared address space)} \\
 
-& \textbf{\sysname} 
+\textbf{\sysname} 
+& \textbf{Datapath}
 & \textbf{Distributed} 
 & \textbf{LAPIC timer (Hardware)} 
 & \textbf{Approximate PS via per-core preemption to improve scalability} 
@@ -97,278 +80,58 @@ Existing works explore various preemption mechanisms, including POSIX signals, I
 \label{tab:comparison}
 \end{table*}
 
-% \begin{table*}[t]
-% \centering
-% \begin{tabular}{llllll}
-% \toprule
-% Preemption Site & System   & Model        & Mechanism       & Purpose                          & App Cooperation \\
-% \midrule
-% \multirow{3}{*}{Off-path} 
-%                 & Caladan  & Centralized  & Broadcast IPI   & Core allocation                  & Yes \\
-%                 & Vessel   & Centralized  & User interrupt  & Core sharing                     & No  \\
-%                 & ZygOS    & Distributed  & Unicast IPI     & Load balancing via work stealing & No  \\
-% \midrule
-% \multirow{2}{*}{On-path}  
-%                 & Shinjuku & Centralized  & Unicast IPI     & \multirow{2}{*}{Approximate Processor Sharing}      & No  \\
-%                 & Concord  & Centralized  & Cache polling   &     & Yes \\
-% \bottomrule
-% \end{tabular}
-% \caption{Comparison of user-level preemption mechanisms in modern dataplane OSes.}
-% \label{tab:preemption-summary}
-% \end{table*}
+\subsection{Existing Preemption Models}
+\label{subsec:existing-preemption-models}
 
-% \subsection{Scalability Dilemma of Centralized Preemption}
+\paragraph{Triggered Path}
+Even though dataplane OSes commonly use preemptive scheduling to reduce tail latency, they differ in the path where preemption takes place.
+Some systems~\cite{prekas2017zygos,fried2020caladan,lin2024fast} trigger preemption on the \textit{control path}, where preemption is used to balance load across cores or adjust core allocation for applications.
+Since control path preemption does not directly affect latency-critical tasks, it has more relaxed timing requirements.
+Other systems~\cite{kaffes2019shinjuku,iyer2023achieving} trigger preemption on the \textit{datapath}, where preemption directly affects latency-sensitive tasks.
+Datapath preemption requires precise timing to ensure latency-sensitive tasks receive timely execution and low overhead to avoid excessive disruption to the datapath.
 
-% We now discuss the scalability challenges of using a centralized preemption dispatcher to preempt remote worker cores.
+\paragraph{Topology}
+Preemption can be issued using either a \textit{centralized} or \textit{distributed} topology.
+In a centralized topology, a dedicated dispatcher issues preemptions to remote worker cores.
+For instance, Shinjuku~\cite{kaffes2019shinjuku} and Concord~\cite{iyer2023achieving} use a centralized dispatcher to preempt remote cores on the datapath to approximate a hybrid of central First-Come-First-Served (FCFS) and Processor Sharing (PS) scheduling.
+In a distributed topology, each core is responsible for issuing preemptions to itself.
+For example, an idle worker core in ZygOS~\cite{prekas2017zygos} could preempt a remote busy core, forcing it to execute network stack and replenish its work queue with new application tasks.
+Then the idle core can steal tasks from the busy core to balance load across cores.
 
-% Centralized preemption dispatching policy spectrum has two extremes:
-% \begin{enumerate*}[label=(\roman*)]
-%   \item \textit{Sequential unicast policy}, where the dispatcher issues preemptions to individual cores via unicast IPIs.
-%   \item \textit{Batched multicast policy}, where the dispatcher issues preemptions to all cores at fixed intervals to minimize preemption issuing overhead.
-% \end{enumerate*}
-% We model a partial batching policy between these two extremes, where the dispatcher issues preemptions to groups of cores via multicast IPIs.
+\paragraph{Mechanism}
+Existing dataplane OSes use various mechanisms to implement preemption, each with different trade-offs in terms of latency and overhead.
+A prevalent mechanism is the \textit{Inter-Processor Interrupt} (IPI), which allows one core to interrupt another core by sending a special interrupt signal.
+Shinjuku~\cite{kaffes2019shinjuku} and ZygOS~\cite{prekas2017zygos} use unicast IPIs to preempt remote cores on the datapath and control path, respectively.
+Caladan~\cite{fried2020caladan} uses multicast IPIs to notify multiple cores of the core adjustment decision, amortizing the per-core preemption overhead.
+A new mechanism is \textit{cache-coherent messaging} from Concord~\cite{iyer2023achieving}, which leverages cache coherence protocols to set preemption flag in the target core's cache line.
+This allows low-overhead, cooperative preemption.
 
-% We use an analytical model to illustrate the scalability dilemma of centralized preemption dispatchers.
+\paragraph{Application cooperation}
+Most existing dataplane OSes do not require application cooperation for preemption.
+Both IPI and User Interrupt mechanisms guarantee immediate preemption of the target core, regardless of the application's state.
+Concord~\cite{iyer2023achieving} is an exception, since it uses cooperative preemption via cache-coherent messaging.
+This mechanism relies on the application to periodically poll the cache line for preemption flags and explicitly yield control to the scheduler.
+While this reduces preemption overhead, it risks missing preemption deadlines.
+If the compiler failed to insert these polling points at appropriate locations, for instance in third-party libraries, the application would not be preempted in time, leading to potential tail latency SLO violations.
 
-% \paragraph{System setup}
-% We consider a system with $N$ cores in total.
-% Out of these, $n_w$ cores are available for worker threads, while $n_d$ cores are dedicated to preemption dispatching.
-% Thus, we have the constraint that $N = n_w + n_d$.
-% We define preemption quantum $q$.
-% We first consider the case where the dispatcher uses a single core, i.e., $n_d = 1$.
-% We later externd the model to consider multiple dispatcher cores for core efficiency analysis.
+\subsection{Existing Isolation Models}
+\label{subsec:existing-isolation-models}
 
-% We define \textit{preemption drift} $\delta_i$ as the difference between the ideal preemption time (preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
-% The worst-case preemption drift across all cores is defined as $\Delta = \max_{i=1}^{n_w} \delta_i$.
-% Based on the profiling result in \cref{preemption-in-dataplane-os}, we define the cost of sending unicast IPI as $c_u$ and multicast IPI as the sum of base cost $c_b$ and incremental cost per core $c_m$.
+\paragraph{Between application and scheduler}
+Many dataplane OSes~\cite{kaffes2019shinjuku,zhang2021demikernel,iyer2023achieving} adopt \textit{single address space} architecture where the application and scheduler share the same memory space.
+They execute both the application and the scheduler in Ring 3 without memory isolation.
+This design prioritizes performance by implicitly assuming a trusted application model.
+however, it leaves the system fragile, as any bug in the application can corrupt the scheduler's state.
+To restore safety, systems like IX~\cite{belay2014ix} and ZygOS~\cite{prekas2017zygos} leverage hardware virtualization to run the scheduler in Ring 0 (non-root) mode, strictly isolating it from Ring 3 applications.
+However, the ring transitions ($\texttt{VMEXIT}$/$\texttt{VMENTER}$) are still expensive, often necessitating request batching that degrades tail latency.
+More recently, Vessel~\cite{lin2024fast} leverages MPK to provide lightweight isolation between user processes and scheduler within the same address space.
+User processes of an application execute with restricted permissions, accessing only the memory region associated with a single protection key assigned to it.
+In contrast, the scheduler operates in a privileged mode with access enabled for all protection keys to perform user process switching.
 
-% \paragraph{Preemption precision drift}
-
-
-% \paragraph{Preemption overhead}
-% % In per-core preemption, the dispatcher must issue preemptions to all $n_w$ cores individually.
-% % The total preemption dispatching overhead is therefore $Overhead^{\text{per-core}}_{\text{dispatch}} = n_w * c_u = O(n_w)$.
-% % In batch-all preemption, the dispatcher issues preemptions to all cores via a single multicast IPI.
-% % The total preemption dispatching overhead is therefore $Overhead^{\text{batch-all}}_{\text{dispatch}} = c_b + n_w * c_m = O(n_w)$.
-
-% \paragraph{Core efficiency}
-% To make the system stable, the average preemption dispatching overhead per quantum must be less than the quantum itself, i.e., $Overhead_{\text{dispatch}} < n_d \cdot q$.
-% The minimum number of dispatcher cores required is therefore $n_d^{\text{min}} = \lceil \frac{Overhead_{\text{dispatch}}}{q} \rceil$.
-% In per-core preemption, the minimum number of dispatcher cores required is $n_d^{per-core}(n_w, q) = \lceil \frac{n_w * c_u}{q} \rceil = O(n_w)$.
-% In batch-all preemption, the minimum number of dispatcher cores required is $n_d^{\text{batch-all}}(n_w, q) = \lceil \frac{c_b + n_w * c_m}{q} \rceil = O(n_w)$.
-% We define core efficiency as the fraction of cores available for worker threads, i.e., $\eta = \frac{n_w}{N}$.
-% In per-core preemption, the maximum core efficiency achievable is therefore $\eta^{\text{per-core}}_{\text{max}}(N, q) = \frac{n_w}{N} = \frac{N - n_d^{\text{per-core}}(n_w, q)}{N} = \frac{N - \lceil \frac{n_w * c_u}{q} \rceil}{N}$.
-% In batch-all preemption, the maximum core efficiency achievable is therefore $\eta^{\text{batch-all}}_{\text{max}}(N, q) = \frac{n_w}{N} = \frac{N - n_d^{\text{batch-all}}(n_w, q)}{N} = \frac{N - \lceil \frac{c_b + n_w * c_m}{q} \rceil}{N}$.
-
-% % \paragraph{Preemption precision and preemption overhead}
-% % Centralized dispatchers face a fundamental trade-off between preemption precision and preemption overhead.
-% % In the instant per-core preemption extreme, the dispatcher issues preemptions to each core immediately.
-% % This ensures high preemption precision of $O(1)$, but incurs preemption overhead of $O(n)$, since the dispatcher must issue preemptions to all $n$ cores individually.
-% % In contrast, in the fixed-interval batch-all preemption extreme, the dispatcher issues preemptions to all cores at fixed intervals.
-% % This minimizes preemption overhead to $O(1)$, but results in low preemption precision of $O(q)$, since a core may have to wait up to $q$ time before receiving a preemption.
-
-% % \paragraph{Preemption precision and core efficiency}
-
-\subsection{Scalability Dilemma of Centralized Preemption}
-\label{subsec:scalability-dilemma}
-
-% We now analyze the scalability challenges of using a centralized dispatcher to preempt worker cores:
-% as core counts grow, the overhead of issuing preemptions increases, forcing a
-% trade-off between preemption precision and core efficiency.
-% This trade-off can be illustrated by two extreme dispatching policies:
-% \begin{enumerate*}[label=(\roman*)]
-%   \item \textit{Sequential unicast}, where the dispatcher preempts individual cores one at a time using unicast IPIs, and
-%   \item \textit{Batched multicast}, where the dispatcher preempts all cores at once using multicast IPIs
-% \end{enumerate*}.
-% Sequential unicast policy enables precise per-core control over preemption timing, allowing each worker to be preempted exactly when needed.
-% However, this approach requires the dispatcher to track and interrupt each core independently, incurring overhead that grows linearly with the number of cores.
-% In contrast, batched multicast mitigates this overhead by sending a single interrupt to multiple cores at once, yet the cost still grows linearly to the number of batched cores(\cref{preemption-in-dataplane-os}) and worker cores must wait for the next batch to be preempted.
-% The policy design space is infinite, but essentially trades off preemption precision against preemption overhead between these two extremes.
-% To prove this, we also have a \textit{partial batching policy}, where the dispatcher issues preemptions to groups of worker cores via multicast IPIs.
-
-% We use an analytical model to illustrate the scalability dilemma of centralized preemption dispatchers.
-
-% \paragraph{System setup}
-% We consider a system with $N$ cores in total.
-% Out of these, $n_w$ cores are available for worker threads, while $n_d$ cores are dedicated to preemption dispatching.
-% Thus, we have the constraint that $N = n_w + n_d$.
-% We define preemption quantum $q$.
-% We first consider the case where the dispatcher uses a single core, i.e., $n_d = 1$.
-% We later extend the model to consider multiple dispatcher cores for core efficiency analysis.
-
-% We define \textit{preemption drift} $\delta_i$ as the difference between the ideal preemption time (preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
-% The worst-case preemption drift across all cores is defined as $\Delta = \max_{i=1}^{n_w} \delta_i$.
-% Based on the profiling result in \cref{preemption-in-dataplane-os}, we define the cost of sending unicast IPI as $c_u$ and multicast IPI as the sum of base cost $c_b$ and incremental cost per core $c_m$:
-% \begin{equation}
-% C_{\text{multi}}(n) = c_b + n \cdot c_m
-% \end{equation}
-
-% \paragraph{Preemption overhead}
-
-% We now analyze the dispatcher utilization for each policy.
-% Workers at full capacity generate preemption events at rate $f/q$ per worker (where $f$ is the CPU frequency), yielding a system-wide preemption rate of $n_w \cdot f/q$.
-
-% \textbf{Sequential unicast.}
-% The dispatcher sends $n_w$ unicast IPIs per quantum, consuming $n_w \cdot c_u$ cycles.
-% Dispatcher utilization is:
-% \begin{equation}
-% \rho_{\text{seq}} = \frac{n_w \cdot c_u}{q}
-% \label{eq:util-seq}
-% \end{equation}
-
-% \textbf{Batched multicast.}
-% The dispatcher sends one multicast IPI to all $n_w$ workers per quantum, consuming $C_{\text{multi}}(n_w)$ cycles.
-% Dispatcher utilization is:
-% \begin{equation}
-% \rho_{\text{batch}} = \frac{c_b + n_w \cdot c_m}{q}
-% \label{eq:util-batch}
-% \end{equation}
-
-% \textbf{Partial batching.}
-% The dispatcher sends $g$ multicast IPIs per quantum, each to a group of $\lceil n_w / g \rceil$ workers.
-% Dispatcher utilization is:
-% \begin{equation}
-% \rho_{\text{partial}}(g) = \frac{g \cdot c_b + n_w \cdot c_m}{q}
-% \label{eq:util-partial}
-% \end{equation}
-
-% For stability, we require $\rho < 1$.
-% This yields maximum scalable workers:
-% \begin{align}
-% {n_w}^{\text{max}}_{\text{seq}} &= \left\lfloor \frac{q}{c_u} \right\rfloor \\
-% {n_w}^{\text{max}}_{\text{batch}} &= \left\lfloor \frac{q - c_b}{c_m} \right\rfloor
-% \end{align}
-
-% Since $c_u > c_m$ (unicast is more expensive than incremental multicast cost), batched multicast can support more workers with a single dispatcher.
-% However, both policies exhibit \textit{linear} growth in dispatcher utilization with $n_w$, as shown in \Cref{fig:overhead-scaling}.
-
-% \begin{figure}[t]
-%   \centering
-%   \includegraphics[width=0.8\columnwidth]{figs/overhead-scaling.pdf}
-%   \caption{Dispatcher utilization versus number of worker cores. Both sequential and batched policies exhibit linear growth, but batched has a smaller slope ($c_m < c_u$).}
-%   \label{fig:overhead-scaling}
-% \end{figure}
-
-% \paragraph{Preemption precision drift}
-
-% We analyze precision drift for each policy assuming all workers reach their quantum boundary simultaneously in the worst case.
-
-% \textbf{Sequential unicast.}
-% A single dispatcher ($n_d = 1$) monitors all $n_w$ workers.
-% When a worker reaches quantum $q$, the dispatcher sends a unicast IPI with cost $c_u$.
-% In the worst case, all workers reach their quantum at the same ideal time $t_0$, and the dispatcher processes them sequentially:
-% worker $i$ receives its preemption IPI at time $t_0 + (i-1) \cdot c_u$, yielding drift $\delta_i = (i-1) \cdot c_u$.
-
-% The worst-case preemption drift is:
-% \begin{equation}
-% \Delta_{\text{seq}} = c_u \cdot (n_w - 1)
-% \label{eq:drift-seq}
-% \end{equation}
-
-% \textbf{Batched multicast.}
-% A single dispatcher sends periodic multicast IPIs to all $n_w$ workers at fixed intervals equal to the quantum $q$.
-% Batches are sent at times $0, q, 2q, \ldots$.
-% A worker reaching its quantum at time $t = kq + \tau$ (where $\tau \in [0, q)$) must wait until the next batch at $(k+1)q$, incurring drift $\delta = q - \tau$.
-
-% The worst-case preemption drift is:
-% \begin{equation}
-% \Delta_{\text{batch}} = q
-% \label{eq:drift-batch}
-% \end{equation}
-
-% \textbf{Partial batching.}
-% We introduce an intermediate policy parameterized by the number of groups $g$ ($1 \leq g \leq n_w$).
-% The dispatcher partitions workers into $g$ groups, each with $\lceil n_w / g \rceil$ workers.
-% At each quantum boundary, the dispatcher sequentially sends multicast IPIs to each group.
-% Workers in group $j$ experience drift from both batch alignment (waiting for the quantum boundary) and sequential group processing:
-% \begin{equation}
-% \delta_j = q + (j-1) \cdot C_{\text{multi}}\left(\left\lceil \frac{n_w}{g} \right\rceil\right)
-% \end{equation}
-
-% The worst-case drift is:
-% \begin{equation}
-% \Delta_{\text{partial}}(g) = q + (g-1) \left( c_b + \left\lceil \frac{n_w}{g} \right\rceil \cdot c_m \right)
-% \label{eq:drift-partial}
-% \end{equation}
-
-% This interpolates between the two extremes:
-% for $g = 1$ (fully batched), $\Delta_{\text{partial}}(1) = q = \Delta_{\text{batch}}$;
-% for $g = n_w$ with $c_u = c_b + c_m$ (fully sequential), $\Delta_{\text{partial}}(n_w) = q + (n_w-1)c_u$.
-
-% \textbf{Key observation.}
-% Sequential unicast drift grows \textit{linearly} with worker count ($\Delta_{\text{seq}} \propto n_w$), while batched multicast drift remains \textit{constant} but equals the full quantum ($\Delta_{\text{batch}} = q$).
-% \Cref{fig:drift-scaling} illustrates this fundamental trade-off.
-
-% \begin{figure}[t]
-%   \centering
-%   \includegraphics[width=0.8\columnwidth]{figs/drift-scaling.pdf}
-%   \caption{Worst-case preemption drift versus number of worker cores for different policies. Sequential drift grows linearly with $n_w$, while batched drift remains constant at $q$.}
-%   \label{fig:drift-scaling}
-% \end{figure}
-
-% \paragraph{Core efficiency}
-
-% To maintain system stability while scaling to large core counts, we can dedicate multiple cores to dispatching ($n_d > 1$).
-% With $n_d$ dispatchers, each handles $\lceil n_w / n_d \rceil$ workers.
-
-% \textbf{Sequential with multiple dispatchers.}
-% Each dispatcher sends $\lceil n_w / n_d \rceil$ unicast IPIs per quantum.
-% For stability, we require:
-% \begin{equation}
-% n_d \geq \left\lceil \frac{n_w \cdot c_u}{q} \right\rceil
-% \label{eq:dispatchers-seq}
-% \end{equation}
-
-% With multiple dispatchers, precision drift improves:
-% \begin{equation}
-% \Delta_{\text{seq}}(n_d) = c_u \left( \left\lceil \frac{n_w}{n_d} \right\rceil - 1 \right)
-% \label{eq:drift-seq-multi}
-% \end{equation}
-
-% \textbf{Batched with multiple dispatchers.}
-% Workers are partitioned into $n_d$ groups, each served by one dispatcher sending multicast IPIs.
-% For stability:
-% \begin{equation}
-% n_d \geq \left\lceil \frac{n_w \cdot c_m}{q} \right\rceil
-% \label{eq:dispatchers-batch}
-% \end{equation}
-
-% However, precision drift remains unchanged:
-% \begin{equation}
-% \Delta_{\text{batch}}(n_d) = q
-% \end{equation}
-
-% Adding dispatchers reduces overhead but does not improve precision for batched policies.
-
-% \textbf{Worker efficiency.}
-% Given the constraint $N = n_w + n_d$, the fraction of cores available for useful work is $\eta = n_w / N$.
-% Substituting the stability requirements:
-
-% For sequential:
-% \begin{equation}
-% \eta_{\text{seq}} = \frac{n_w}{N} \leq \frac{q}{q + c_u}
-% \label{eq:efficiency-seq}
-% \end{equation}
-
-% For batched:
-% \begin{equation}
-% \eta_{\text{batch}} = \frac{n_w}{N} \leq \frac{q}{q + c_m}
-% \label{eq:efficiency-batch}
-% \end{equation}
-
-% Since $c_m < c_u$, batched achieves higher worker efficiency.
-% However, as $N \to \infty$, both policies lose a \textit{constant fraction} of cores to dispatching: sequential loses $c_u/(q+c_u)$ and batched loses $c_m/(q+c_m)$.
-
-% \Cref{fig:efficiency-tradeoff} illustrates the fundamental trade-off: sequential can trade dispatcher cores for better precision (by increasing $n_d$), while batched achieves better efficiency but cannot improve precision regardless of $n_d$.
-
-% \begin{figure}[t]
-%   \centering
-%   \includegraphics[width=0.8\columnwidth]{figs/efficiency-tradeoff.pdf}
-%   \caption{Worker efficiency versus worst-case drift for different policies and dispatcher allocations. Sequential policies can trade efficiency for precision, while batched policies achieve higher efficiency but are bounded by drift = $q$.}
-%   \label{fig:efficiency-tradeoff}
-% \end{figure}
-
-% \textbf{Fundamental limit.}
-% Our model reveals a fundamental scalability dilemma for centralized preemption dispatchers: achieving tight precision ($\Delta \ll q$) requires sacrificing core efficiency (dedicating $\Theta(n_w)$ dispatcher cores), while maintaining high efficiency ($\eta \approx 1$) results in poor precision ($\Delta = \Theta(q)$ or worse).
-% No centralized architecture can simultaneously achieve constant precision, constant dispatcher overhead, and unbounded scalability.
-% This motivates our design of a decentralized preemption mechanism in \Cref{sec:design}.
+\paragraph{Between applications}
+To isolate multiple applications running on the same dataplane OS, most existing systems~\cite{belay2014ix,prekas2017zygos,fried2020caladan} rely on strong isolation provided by the kernel.
+Each application runs as a separate kernel process, with its own virtual address space and protected resources.
+This model ensures robust isolation between applications, preventing interference and security breaches.
+Vessel~\cite{lin2024fast} takes a different approach by using MPK to isolate applications within the same address space.
+Each application is assigned a unique protection key, and memory regions are tagged with the corresponding keys.
+This allows for extremely lightweight context switching between applications, as the system only needs to change the active protection key rather than performing a full address space switch via TLB flushes.

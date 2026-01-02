@@ -36,22 +36,28 @@ it can either reduce preemption frequency, increasing the risk of tail latency S
 % To mitigate this dilemma, the dataplane OS could reserve additional cores solely for preemption issuing to guarantee preemption precision.
 % This creates a compounded scalability challenge: preserving preemption precision both increases preemption overhead and reduces core efficiency.
 
-In this work, we address the scalability dilemma with \sysname, a new dataplane OS that enables distributed, microsecond-scale preemptive scheduling for multi-core servers.
-Our key insight is that modern processors already include the necessary hardware for fine-grained, per-core preemption—namely, the Local Advanced Programmable Interrupt Controller (LAPIC) timer.
-However, the LAPIC timer is traditionally managed exclusively by the kernel to schedule kernel threads, making it inaccessible to dataplane OSes.
-Thus, instead of adding new hardware features, we ask the following question:
-\textit{Can we safely expose the LAPIC timer to the dataplane OS scheduler?}
+In this work, we address the scalability dilemma with \sysname, a new dataplane OS that enables distributed, microsecond-scale preemptive scheduling on multi-core servers.
+Our key insight is that modern processors already provide hardware support for fine-grained, per-core preemption through the Local Advanced Programmable Interrupt Controller (LAPIC) timer.
+However, the LAPIC timer is traditionally reserved for kernel use and is inaccessible by dataplane OS schedulers.
+This leads to the central question of our work:
+\textit{Can we safely expose kernel-critical hardware resources like the LAPIC timer to the dataplane OS scheduler?}
 
-To answer this, \sysname introduces fine-grained privilege separation within userspace.
-Specifically, it defines the \textit{Shadow Ring}: a lightweight software enclave that shares the same hardware privilege level (i.e., Ring 3 on x86) as other userspace code, but is explicitly isolated using Memory Protection Keys (MPK).
-Shadow Ring allows \sysname to extend the Exokernel philosophy beyond NIC queues by exposing system-critical hardware, such as the LAPIC timer, directly to the trusted enclave.
+Prior dataplane OSes have explored isolation mechanisms in userspace, but they are not designed to securely multiplex hardware resources between the kernel and a userspace scheduler.
+IX, ZygOS, and Arrakis expose I/O devices like NIC queues to applications using hardware virtualization (e.g., VT-x, IOMMU), assuming exclusive ownership and coarse-grained protection.
+Vessel uses MPK to isolate a privileged userspace scheduler from untrusted application code within the same address space, but it does not expose or protect low-level hardware resources like LAPIC timer.
+
+\sysname fills this gap by introducing privilege separation within userspace for managing kernel-critical hardware resources.
+At the core of this design is the \textit{Shadow Ring}, a lightweight software enclave that shares the same privilege level (Ring 3) as application code but is memory-isolated using MPK.
+Unlike prior systems that rely on full device ownership to userspace, \sysname enables secure multiplexing of kernel-critical hardware like the LAPIC timer to a trusted scheduler in userspace.
+Shadow Ring allows \sysname to extend the Exokernel philosophy beyond I/O devices, enabling direct, low-latency control over system-critical resources without compromising safety.
 The \sysname scheduler therefore operates across two isolated zones:
 \begin{enumerate*}[label=(\roman*)]
   \item an untrusted zone that manages user-level threads and executes alongside application code, and
-  \item a trusted zone (\schedcore), which runs in the MPK-isolated Shadow Ring and interacts directly with critical hardware.
+  \item a trusted zone (\schedcore), which runs in the Shadow Ring and interacts directly with privileged hardware.
 \end{enumerate*}
 
-Since system-critical hardware resources still require privileged access in modern operating systems, \sysname relies on a kernel module (\kmod) as a secure mediation layer between \schedcore and the underlying hardware.
+Although the Shadow Ring isolates trusted scheduler logic in userspace, access to system-critical hardware still requires mediation from the kernel.
+To support this, \sysname introduces a minimal kernel module (\kmod) that securely mediates access between \schedcore and hardware components such as the LAPIC timer.
 To configure a hardware resource, \schedcore can either 
 \begin{enumerate*}[label=(\arabic*)]
   \item issue a \textit{downcall} via a system call (e.g., \texttt{ioctl()}) that traps into Ring 0, where \kmod completes hardware configuration, or

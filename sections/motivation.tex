@@ -1,0 +1,227 @@
+In this section, we analyze the scalability challenges inherent in centralized preemption architectures. 
+We first profile the overhead of preemption mechanisms commonly used in existing dataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent messaging (\S~\ref{subsec:profiling-preemption-mechanisms}).
+Based on these empirical measurements, we construct an analytical model to formalize the scalability limits of a centralized dispatcher (\S~\ref{subsec:model-setup}).
+We then use the model to evaluate how increasing the core count impacts system performance across three key dimensions: total preemption overhead (\S~\ref{subsec:preemption-overhead}), preemption precision drift (\S~\ref{subsec:preemption-precision-drift}), as well as core efficiency and throughput loss (\S~\ref{subsec:core-efficiency-and-throughput-loss}).
+
+\subsection{Profiling Common Preemption Mechanisms}
+\label{subsec:profiling-preemption-mechanisms}
+
+\subsection{Model Setup}
+\label{subsec:model-setup}
+
+We consider a system with $N$ cores in total.
+% Out of these, $n_w$ cores are available for worker threads, while $n_d$ cores are dedicated to preemption dispatching.
+% Thus, we have the constraint that $N = n_w + n_d$.
+% We define preemption quantum $q$.
+% We first consider the case where the dispatcher uses a single core, i.e., $n_d = 1$.
+% We later extend the model to consider multiple dispatcher cores for core efficiency analysis.
+
+\subsection{Preemption Overhead}
+\label{subsec:preemption-overhead}
+
+\subsection{Preemption Precision Drift}
+\label{subsec:preemption-precision-drift}
+
+\subsection{Core Efficiency and Throughput Loss}
+\label{subsec:core-efficiency-and-throughput-loss}
+
+% We now analyze the scalability challenges of using a centralized dispatcher to preempt worker cores:
+% as core counts grow, the overhead of issuing preemptions increases, forcing a
+% trade-off between preemption precision and core efficiency.
+% This trade-off can be illustrated by two extreme dispatching policies:
+% \begin{enumerate*}[label=(\roman*)]
+%   \item \textit{Sequential unicast}, where the dispatcher preempts individual cores one at a time using unicast IPIs, and
+%   \item \textit{Batched multicast}, where the dispatcher preempts all cores at once using multicast IPIs
+% \end{enumerate*}.
+% Sequential unicast policy enables precise per-core control over preemption timing, allowing each worker to be preempted exactly when needed.
+% However, this approach requires the dispatcher to track and interrupt each core independently, incurring overhead that grows linearly with the number of cores.
+% In contrast, batched multicast mitigates this overhead by sending a single interrupt to multiple cores at once, yet the cost still grows linearly to the number of batched cores(\cref{preemption-in-dataplane-os}) and worker cores must wait for the next batch to be preempted.
+% The policy design space is infinite, but essentially trades off preemption precision against preemption overhead between these two extremes.
+% To prove this, we also have a \textit{partial batching policy}, where the dispatcher issues preemptions to groups of worker cores via multicast IPIs.
+
+% We use an analytical model to illustrate the scalability dilemma of centralized preemption dispatchers.
+
+% \paragraph{System setup}
+% We consider a system with $N$ cores in total.
+% Out of these, $n_w$ cores are available for worker threads, while $n_d$ cores are dedicated to preemption dispatching.
+% Thus, we have the constraint that $N = n_w + n_d$.
+% We define preemption quantum $q$.
+% We first consider the case where the dispatcher uses a single core, i.e., $n_d = 1$.
+% We later extend the model to consider multiple dispatcher cores for core efficiency analysis.
+
+% We define \textit{preemption drift} $\delta_i$ as the difference between the ideal preemption time (preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
+% The worst-case preemption drift across all cores is defined as $\Delta = \max_{i=1}^{n_w} \delta_i$.
+% Based on the profiling result in \cref{preemption-in-dataplane-os}, we define the cost of sending unicast IPI as $c_u$ and multicast IPI as the sum of base cost $c_b$ and incremental cost per core $c_m$:
+% \begin{equation}
+% C_{\text{multi}}(n) = c_b + n \cdot c_m
+% \end{equation}
+
+% \paragraph{Preemption overhead}
+
+% We now analyze the dispatcher utilization for each policy.
+% Workers at full capacity generate preemption events at rate $f/q$ per worker (where $f$ is the CPU frequency), yielding a system-wide preemption rate of $n_w \cdot f/q$.
+
+% \textbf{Sequential unicast.}
+% The dispatcher sends $n_w$ unicast IPIs per quantum, consuming $n_w \cdot c_u$ cycles.
+% Dispatcher utilization is:
+% \begin{equation}
+% \rho_{\text{seq}} = \frac{n_w \cdot c_u}{q}
+% \label{eq:util-seq}
+% \end{equation}
+
+% \textbf{Batched multicast.}
+% The dispatcher sends one multicast IPI to all $n_w$ workers per quantum, consuming $C_{\text{multi}}(n_w)$ cycles.
+% Dispatcher utilization is:
+% \begin{equation}
+% \rho_{\text{batch}} = \frac{c_b + n_w \cdot c_m}{q}
+% \label{eq:util-batch}
+% \end{equation}
+
+% \textbf{Partial batching.}
+% The dispatcher sends $g$ multicast IPIs per quantum, each to a group of $\lceil n_w / g \rceil$ workers.
+% Dispatcher utilization is:
+% \begin{equation}
+% \rho_{\text{partial}}(g) = \frac{g \cdot c_b + n_w \cdot c_m}{q}
+% \label{eq:util-partial}
+% \end{equation}
+
+% For stability, we require $\rho < 1$.
+% This yields maximum scalable workers:
+% \begin{align}
+% {n_w}^{\text{max}}_{\text{seq}} &= \left\lfloor \frac{q}{c_u} \right\rfloor \\
+% {n_w}^{\text{max}}_{\text{batch}} &= \left\lfloor \frac{q - c_b}{c_m} \right\rfloor
+% \end{align}
+
+% Since $c_u > c_m$ (unicast is more expensive than incremental multicast cost), batched multicast can support more workers with a single dispatcher.
+% However, both policies exhibit \textit{linear} growth in dispatcher utilization with $n_w$, as shown in \Cref{fig:overhead-scaling}.
+
+% \begin{figure}[t]
+%   \centering
+%   \includegraphics[width=0.8\columnwidth]{figs/overhead-scaling.pdf}
+%   \caption{Dispatcher utilization versus number of worker cores. Both sequential and batched policies exhibit linear growth, but batched has a smaller slope ($c_m < c_u$).}
+%   \label{fig:overhead-scaling}
+% \end{figure}
+
+% \paragraph{Preemption precision drift}
+
+% We analyze precision drift for each policy assuming all workers reach their quantum boundary simultaneously in the worst case.
+
+% \textbf{Sequential unicast.}
+% A single dispatcher ($n_d = 1$) monitors all $n_w$ workers.
+% When a worker reaches quantum $q$, the dispatcher sends a unicast IPI with cost $c_u$.
+% In the worst case, all workers reach their quantum at the same ideal time $t_0$, and the dispatcher processes them sequentially:
+% worker $i$ receives its preemption IPI at time $t_0 + (i-1) \cdot c_u$, yielding drift $\delta_i = (i-1) \cdot c_u$.
+
+% The worst-case preemption drift is:
+% \begin{equation}
+% \Delta_{\text{seq}} = c_u \cdot (n_w - 1)
+% \label{eq:drift-seq}
+% \end{equation}
+
+% \textbf{Batched multicast.}
+% A single dispatcher sends periodic multicast IPIs to all $n_w$ workers at fixed intervals equal to the quantum $q$.
+% Batches are sent at times $0, q, 2q, \ldots$.
+% A worker reaching its quantum at time $t = kq + \tau$ (where $\tau \in [0, q)$) must wait until the next batch at $(k+1)q$, incurring drift $\delta = q - \tau$.
+
+% The worst-case preemption drift is:
+% \begin{equation}
+% \Delta_{\text{batch}} = q
+% \label{eq:drift-batch}
+% \end{equation}
+
+% \textbf{Partial batching.}
+% We introduce an intermediate policy parameterized by the number of groups $g$ ($1 \leq g \leq n_w$).
+% The dispatcher partitions workers into $g$ groups, each with $\lceil n_w / g \rceil$ workers.
+% At each quantum boundary, the dispatcher sequentially sends multicast IPIs to each group.
+% Workers in group $j$ experience drift from both batch alignment (waiting for the quantum boundary) and sequential group processing:
+% \begin{equation}
+% \delta_j = q + (j-1) \cdot C_{\text{multi}}\left(\left\lceil \frac{n_w}{g} \right\rceil\right)
+% \end{equation}
+
+% The worst-case drift is:
+% \begin{equation}
+% \Delta_{\text{partial}}(g) = q + (g-1) \left( c_b + \left\lceil \frac{n_w}{g} \right\rceil \cdot c_m \right)
+% \label{eq:drift-partial}
+% \end{equation}
+
+% This interpolates between the two extremes:
+% for $g = 1$ (fully batched), $\Delta_{\text{partial}}(1) = q = \Delta_{\text{batch}}$;
+% for $g = n_w$ with $c_u = c_b + c_m$ (fully sequential), $\Delta_{\text{partial}}(n_w) = q + (n_w-1)c_u$.
+
+% \textbf{Key observation.}
+% Sequential unicast drift grows \textit{linearly} with worker count ($\Delta_{\text{seq}} \propto n_w$), while batched multicast drift remains \textit{constant} but equals the full quantum ($\Delta_{\text{batch}} = q$).
+% \Cref{fig:drift-scaling} illustrates this fundamental trade-off.
+
+% \begin{figure}[t]
+%   \centering
+%   \includegraphics[width=0.8\columnwidth]{figs/drift-scaling.pdf}
+%   \caption{Worst-case preemption drift versus number of worker cores for different policies. Sequential drift grows linearly with $n_w$, while batched drift remains constant at $q$.}
+%   \label{fig:drift-scaling}
+% \end{figure}
+
+% \paragraph{Core efficiency}
+
+% To maintain system stability while scaling to large core counts, we can dedicate multiple cores to dispatching ($n_d > 1$).
+% With $n_d$ dispatchers, each handles $\lceil n_w / n_d \rceil$ workers.
+
+% \textbf{Sequential with multiple dispatchers.}
+% Each dispatcher sends $\lceil n_w / n_d \rceil$ unicast IPIs per quantum.
+% For stability, we require:
+% \begin{equation}
+% n_d \geq \left\lceil \frac{n_w \cdot c_u}{q} \right\rceil
+% \label{eq:dispatchers-seq}
+% \end{equation}
+
+% With multiple dispatchers, precision drift improves:
+% \begin{equation}
+% \Delta_{\text{seq}}(n_d) = c_u \left( \left\lceil \frac{n_w}{n_d} \right\rceil - 1 \right)
+% \label{eq:drift-seq-multi}
+% \end{equation}
+
+% \textbf{Batched with multiple dispatchers.}
+% Workers are partitioned into $n_d$ groups, each served by one dispatcher sending multicast IPIs.
+% For stability:
+% \begin{equation}
+% n_d \geq \left\lceil \frac{n_w \cdot c_m}{q} \right\rceil
+% \label{eq:dispatchers-batch}
+% \end{equation}
+
+% However, precision drift remains unchanged:
+% \begin{equation}
+% \Delta_{\text{batch}}(n_d) = q
+% \end{equation}
+
+% Adding dispatchers reduces overhead but does not improve precision for batched policies.
+
+% \textbf{Worker efficiency.}
+% Given the constraint $N = n_w + n_d$, the fraction of cores available for useful work is $\eta = n_w / N$.
+% Substituting the stability requirements:
+
+% For sequential:
+% \begin{equation}
+% \eta_{\text{seq}} = \frac{n_w}{N} \leq \frac{q}{q + c_u}
+% \label{eq:efficiency-seq}
+% \end{equation}
+
+% For batched:
+% \begin{equation}
+% \eta_{\text{batch}} = \frac{n_w}{N} \leq \frac{q}{q + c_m}
+% \label{eq:efficiency-batch}
+% \end{equation}
+
+% Since $c_m < c_u$, batched achieves higher worker efficiency.
+% However, as $N \to \infty$, both policies lose a \textit{constant fraction} of cores to dispatching: sequential loses $c_u/(q+c_u)$ and batched loses $c_m/(q+c_m)$.
+
+% \Cref{fig:efficiency-tradeoff} illustrates the fundamental trade-off: sequential can trade dispatcher cores for better precision (by increasing $n_d$), while batched achieves better efficiency but cannot improve precision regardless of $n_d$.
+
+% \begin{figure}[t]
+%   \centering
+%   \includegraphics[width=0.8\columnwidth]{figs/efficiency-tradeoff.pdf}
+%   \caption{Worker efficiency versus worst-case drift for different policies and dispatcher allocations. Sequential policies can trade efficiency for precision, while batched policies achieve higher efficiency but are bounded by drift = $q$.}
+%   \label{fig:efficiency-tradeoff}
+% \end{figure}
+
+% \textbf{Fundamental limit.}
+% Our model reveals a fundamental scalability dilemma for centralized preemption dispatchers: achieving tight precision ($\Delta \ll q$) requires sacrificing core efficiency (dedicating $\Theta(n_w)$ dispatcher cores), while maintaining high efficiency ($\eta \approx 1$) results in poor precision ($\Delta = \Theta(q)$ or worse).
+% No centralized architecture can simultaneously achieve constant precision, constant dispatcher overhead, and unbounded scalability.
+% This motivates our design of a decentralized preemption mechanism in \Cref{sec:design}.
