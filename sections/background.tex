@@ -23,39 +23,78 @@ Existing works explore various preemption mechanisms, including POSIX signals, I
 
 \yihan{We compare the overhead of these mechanisms in table xx.}
 
-% \begin{table*}[t]
-% \centering
-% \begin{tabular}{ccccccccc}
-% \toprule
-% \multirow{2}{*}{\textbf{Trigger Path}} & \multirow{2}{*}{\textbf{System}} & \multicolumn{5}{c}{\textbf{Preemption}}                                                                                         & \multicolumn{2}{c}{\textbf{Isolation}}           \\
-%                                        &                                  & Topology    & Driven by                 & Mechanism       & Purpose                                           & App Cooperation & Scheduler $\leftrightarrow$ App          & Between Apps          \\
-% \multirow{3}{*}{Control-path}          & ZygOS                            & Distributed & \multirow{5}{*}{Software} & Unicase IPI     & Load balancing by work stealing from remote cores & no              & Ring 0 (non-root)↔Ring 3 & Strong (Kernel)       \\
-%                                        & Caladan                          & Centralized &                           & Multicast IPI   & Core sharing between kernel processes             & yes             & Userspace                & Strong (Kernel)       \\
-%                                        & Vessel                           & Centralized &                           & User interrupt  & Core sharing between lightweight user processes   & no              & Userspace (MPK-isolated) & Weak (shared runtime) \\
-% \multirow{3}{*}{Datapath}              & Shinjuku                         & Centralized &                           & Unicase IPI     & Preempt long running tasks                        & no              & Userspace                & -                     \\
-%                                        & Concord                          & Centralized &                           & Cache coherency & Preempt long running tasks                        & yes             & Userspace                & -                     \\
-%                                        & Cygnus                           & Distributed & Hardware                  & LAPIC timer     & Preempt long running tasks                        & no              & Userspace (MPK-isolated) & Strong (Kernel)       \\
-% \bottomrule
-% \end{tabular}
-% \end{table*}
-
 \begin{table*}[t]
 \centering
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}ll cc L{3.5cm} c L{3.5cm} L{3cm}@{}}
+\begin{tabular}{@{}ll c M{3cm} M{5cm} c M{4.7cm} M{2.6cm}@{}}
 \toprule
-\multirow{2}{*}{\textbf{Trigger Path}} & \multirow{2}{*}{\textbf{System}} & \multicolumn{4}{c}{\textbf{Preemption}} & \multicolumn{2}{c}{\textbf{Isolation}} \\ \cmidrule(lr){3-6} \cmidrule(l){7-8} 
- &  & \textbf{Topology} & \textbf{Driven by} & \textbf{Purpose} & \textbf{App Coop.} & \textbf{App $\leftrightarrow$ Scheduler} & \textbf{Between Apps} \\ \midrule
-\multirow{3}{*}{Control-path} & ZygOS & Distributed & Software & An idle core sends IPI to force a remote core to run network stack & \ding{55} & Hardware Privilege (Ring 3 $\leftrightarrow$ Ring 3) & Strong (Kernel Process) \\
- & Caladan & Centralized & Software & Core scheduler sends IPI to notify the remote core of allocation decision (waking tasks/idling core/reading performance counters) & \ding{55} & None (Shared Address Space) & Strong (Kernel Process) \\
- & Vessel & Centralized & Software & Core sharing between Latency-Critical and Best-Effort user processes & \ding{55} & MPK-isolated region (non-privileged) $\leftrightarrow$ Non-MPK-isolated region (privileged) & Weak (MPK-isolated Pages) \\ \midrule
-\multirow{3}{*}{Datapath} & Shinjuku & Centralized & Software & Microsecond Processor Sharing & \ding{55} & \multicolumn{2}{c}{None (Shared Address Space)} & \\
- & Concord & Centralized & Software & Microsecond Processor Sharing & \ding{51} & \multicolumn{2}{c}{None (Shared Address Space)} & \\
- & \textbf{Cygnus} & \textbf{Distributed} & \textbf{Hardware} & \textbf{Microsecond Processor Sharing} & \textbf{\ding{55}} & \textbf{Shadow Ring (MPK-isolated)} & \textbf{Strong (Kernel Process)} \\ \bottomrule
+\multirow{2}{*}{\textbf{Trigger Path}} & \multirow{2}{*}{\textbf{System}} 
+& \multicolumn{4}{c}{\textbf{Preemption}} 
+& \multicolumn{2}{c}{\textbf{Isolation}} \\ 
+\cmidrule(lr){3-6} \cmidrule(l){7-8}
+ & 
+ & \textbf{Topology} 
+ & \textbf{Mechanism} 
+ & \textbf{Purpose} 
+ & \textbf{App Coop.} 
+ & \textbf{App $\leftrightarrow$ Scheduler} 
+ & \textbf{Between Apps} \\ 
+\midrule
+
+\multirow{3}{*}{Control-path} 
+& ZygOS~\cite{prekas2017zygos} 
+& Distributed 
+& Unicast IPI (Software) 
+& Load balancing by enabling work stealing from busy remote cores 
+& \ding{55} 
+& Ring 3 $\leftrightarrow$ Ring 0 
+& Strong (Kernel Process) \\
+
+& Caladan~\cite{fried2020caladan} 
+& Centralized 
+& Multicast IPI (Software) 
+& Dynamic core adjustment to mitigate interference between latency-critical and best-effort applications 
+& \ding{55} 
+& None (Shared address space) 
+& Strong (Kernel Process) \\
+
+& Vessel~\cite{lin2024fast} 
+& Centralized 
+& User interrupt (Software) 
+& Latency-aware core sharing between user processes in the shared memory address space 
+& \ding{55} 
+& Single-key region (non-privileged) $\leftrightarrow$ All-access region (privileged) 
+& Weak (MPK-isolated pages) \\ 
+\midrule
+
+\multirow{3}{*}{Datapath} 
+& Shinjuku~\cite{kaffes2019shinjuku} 
+& Centralized 
+& Unicast IPI (Software) 
+& Approximate Processor Sharing (PS) to minimize tail latency 
+& \ding{55} 
+& \multicolumn{2}{c}{None (Shared address space)} \\
+
+& Concord~\cite{iyer2023achieving} 
+& Centralized 
+& Cache-coherent messaging (Software) 
+& Approximate PS via cooperative preemption to improve throughput 
+& \ding{51} 
+& \multicolumn{2}{c}{None (Shared address space)} \\
+
+& \textbf{\sysname} 
+& \textbf{Distributed} 
+& \textbf{LAPIC timer (Hardware)} 
+& \textbf{Approximate PS via per-core preemption to improve scalability} 
+& \textbf{\ding{55}} 
+& \textbf{Shadow Ring PKEY-excluded region (non-privileged) $\leftrightarrow$ Shadow Ring (MPK-isolated, privileged)} 
+& \textbf{Strong (Kernel Process)} \\
+
+\bottomrule
 \end{tabular}%
 }
-\caption{Comparison of Cygnus and prior works on user-level preemption mechanisms and isolation properties.}
-\label{tab:taxonomy}
+\caption{Comparison of preemption and isolation designs in \sysname and state-of-the-art dataplane OSes.}
+\label{tab:comparison}
 \end{table*}
 
 % \begin{table*}[t]
