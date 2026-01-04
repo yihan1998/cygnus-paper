@@ -1,7 +1,7 @@
 In this section, we analyze the scalability challenges inherent in centralized preemption architectures. 
 We first analyze the overhead of preemption mechanisms commonly used in existing dataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent messaging (\S~\ref{subsec:overhead-analysis}).
 Based on these empirical measurements, we construct an analytical model to formalize the scalability limits of a centralized dispatcher (\S~\ref{subsec:model-setup}).
-We then use the model to evaluate how increasing the core count impacts system performance on preemption precision drift (\S~\ref{subsec:preemption-precision-drift}) as well as core efficiency and throughput loss (\S~\ref{subsec:core-efficiency-and-throughput-loss}).
+We then use the model to evaluate how increasing the core count impacts system performance on preemption precision drift (\S~\ref{subsec:preemption-precision-drift}) and core efficiency (\S~\ref{subsec:core-efficiency}).
 
 \subsection{Overhead Analysis of Common Preemption Mechanisms}
 \label{subsec:overhead-analysis}
@@ -122,10 +122,10 @@ The worst-case drift is:
 &= g \cdot c_b + n_w \cdot c_m + q
 \end{align}
 
-\subsection{Core Efficiency and Throughput Loss}
-\label{subsec:core-efficiency-and-throughput-loss}
+\subsection{Core Efficiency}
+\label{subsec:core-efficiency}
 
-We then analyze the core efficiency and throughput loss for each policy under the constraint of a fixed total core count $N$, partitioned into $n_d$ dispatcher cores and $n_w$ worker cores.
+We then analyze the core efficiency for each policy under the constraint of a fixed total core count $N$, partitioned into $n_d$ dispatcher cores and $n_w$ worker cores.
 
 First, we define the \textit{dispatcher utilization} ($\rho$) as the fraction of time the dispatcher spends sending preemptions within each quantum.
 Assuming the workload is sharded evenly across $n_d$ dispatcher cores, the utilization is:
@@ -135,10 +135,6 @@ Assuming the workload is sharded evenly across $n_d$ dispatcher cores, the utili
 To maintain preemption stability under a target quantum $q$, the dispatcher utilization must satisfy $\rho < 1$.
 
 Second, we define the \textit{core efficiency} ($\eta$) as the fraction of worker cores available for application tasks after accounting for dispatcher cores: $\eta = \frac{n_w}{N} = \frac{N - n_d}{N} = 1 - \frac{n_d}{N}$.
-The throughput loss ($\Theta$) due to dispatcher cores is:
-\begin{equation}
-\Theta = 1 - \eta = \frac{n_d}{N}
-\end{equation}
 
 \paragraph{Sequential unicast}
 Since the dispatcher serializes unicasts, the total overhead scales linearly with $n_w$.
