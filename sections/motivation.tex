@@ -72,7 +72,7 @@ We assume the system have preemption quantum $q$.
 % \end{equation}
 
 For the sake of simplicity, we first consider the case where the dispatcher uses a single core in \S~\ref{subsec:preemption-precision-drift}.
-We later extend the model to consider multiple dispatcher cores for core efficiency analysis in \S~\ref{subsec:core-efficiency-and-throughput-loss}.
+We later extend the model to consider multiple dispatcher cores for core efficiency analysis in \S~\ref{subsec:core-efficiency}.
 
 \subsection{Preemption Precision Drift}
 \label{subsec:preemption-precision-drift}
@@ -97,8 +97,9 @@ Eq. \ref{drift_eq} breaks down the sources of $\delta_i$ into three components:
 Using Eq. \ref{drift_eq}, we analyze the drift bounds $[\delta_{\min}, \delta_{\max}]$ to evaluate the precision of each policy.
 
 \paragraph{Sequential Unicast}
-The dispatcher preempts $n_w$ cores serially. 
-The drift depends entirely on the core's position $i$ in the dispatch order.
+The dispatcher issues unicast preemptions to each core whose uses up its quantum one at a time.
+Both $C_{dispatch}$ and $C_{receive}$ are constant, independent of the number of worker cores.
+Thus, the drift of core $i$ depends primarily on the core's position $i$ in the dispatch order.
 \begin{itemize}
     \item \textbf{Best Case ($i=1$):} The first core experiences zero queuing delay.
     \begin{equation}
@@ -109,10 +110,13 @@ The drift depends entirely on the core's position $i$ in the dispatch order.
     \delta_{\max} = n_w \cdot c_u + C_{receive}
     \end{equation}
 \end{itemize}
-The drift range grows linearly with $n_w$, indicating inherent \textit{unfairness}; higher-indexed cores suffer systematically worse preemption precision.
+The drift range grows linearly with $n_w$, indicating inherent \textit{unfairness};
+higher-indexed cores suffer systematically worse preemption precision.
 
 \paragraph{Batched Multicast}
-The dispatcher issues multicast preemptions at fixed intervals of $q$. The drift depends on the alignment between the worker's quantum expiration and the batch clock.
+The dispatcher issues multicast preemptions to all cores at fixed intervals of $q$.
+Both $C_{dispatch}$ and $C_{receive}$ increase with the number of worker cores due to underlying hardware serialization.
+The drift depends on the alignment between the worker's quantum expiration and the batch clock.
 \begin{itemize}
     \item \textbf{Best Case:} The worker reaches its quantum immediately before a batch.
     \begin{equation}
@@ -123,40 +127,60 @@ The dispatcher issues multicast preemptions at fixed intervals of $q$. The drift
     \delta_{\max} = q + C_{dispatch}(n_w) + C_{receive}(n_w)
     \end{equation}
 \end{itemize}
-While the worst-case drift includes the quantization penalty $q$, the variance ($\delta_{\max} - \delta_{\min} = q$) is independent of core count, making the policy \textit{fair} across all workers. However, both bounds rise with $n_w$ due to hardware scalability limits ($C_{receive}(n_w)$).
+While the worst-case drift includes the quantization penalty $q$, the variance ($\delta_{\max} - \delta_{\min} = q$) is independent of core count, making the policy \textit{fair} across all workers. 
 
+\paragraph{Partial Batching}
+The dispatcher aggregates pending preemptions into groups of size $k$ ($1 < k < n_w$) and issues them sequentially.
+Within each group, preemptions are sent in parallel (e.g., via multicast to the subset of cores).
+This policy introduces a tunable parameter $k$ that balances the serialization delay of unicast against the hardware scaling limits of full multicast.
+Unlike Batched Multicast, Partial Batching is event-driven and does not wait for a fixed clock interval $q$, thereby avoiding the quantization penalty.
 
-We now analyze the worst-case preemption precision drift ($\Delta$) under three policies for a system with $n_w$ worker cores.
+\begin{itemize}
+    \item \textbf{Best Case:} The worker belongs to the first group being dispatched.
+    The delay is limited to the formation and transmission of a single group.
+    \begin{equation}
+    \delta_{\min} = C_{dispatch}(k) + C_{receive}(k)
+    \end{equation}
+    \item \textbf{Worst Case:} The worker belongs to the last group (index $\lceil n_w/k \rceil$) when all cores require preemption simultaneously.
+    The core must wait for the serialization of all preceding groups.
+    \begin{equation}
+    \delta_{\max} = \left\lceil \frac{n_w}{k} \right\rceil \cdot c_{group} + C_{receive}(k)
+    \end{equation}
+\end{itemize}
+Here, $c_{group}$ represents the cost to dispatch a single group of size $k$.
+Partial Batching mitigates the linear unfairness of Sequential Unicast (reducing the slope by a factor of $k$) while keeping the hardware receive overhead $C_{receive}(k)$ lower than that of full Batched Multicast ($C_{receive}(n_w)$).
 
-\paragraph{Sequential unicast}
-The dispatcher sends individual preemption signals to each core.
-The send overhead per core is a constant unicast cost ($c_u$).
-In the worst case, all cores exhaust their quanta simultaneously at the same time.
-The $n_w$-th core must wait for the preceding $n_w-1$ unicast preemptions.
-The worst-case drift is the total time to serialize $n_w$ unicasts:
-\begin{equation}
-\Delta_{\text{seq}} = \underbrace{c_u}_{\text{Send}} + \underbrace{(n_w - 1) \cdot c_u}_{\text{Queuing}} = n_w \cdot c_u
-\end{equation}
+% We now analyze the worst-case preemption precision drift ($\Delta$) under three policies for a system with $n_w$ worker cores.
 
-\paragraph{Batched multicast}
-The dispatcher broadcasts a single preemption signal to all $n_w$ cores at fixed intervals equal to the quantum $q$.
-The send overhead is a function of a base multicast cost ($c_b$) and a per-core additional cost ($c_m$), expressed as $\mathit{Overhead}_{\text{batch}} = c_b + n_w \cdot c_m$.
-In the worst case, a core reaching its quantum just after a batch is sent must wait until the next batch, incurring maximum scheduling delay equal to the quantum $q$.
-The worst-case drift is:
-\begin{equation}
-\Delta_{\text{batch}} = \underbrace{(c_b + n_w \cdot c_m)}_{\text{Send}} + \underbrace{q}_{\text{Queuing}}
-\end{equation}
+% \paragraph{Sequential unicast}
+% The dispatcher sends individual preemption signals to each core.
+% The send overhead per core is a constant unicast cost ($c_u$).
+% In the worst case, all cores exhaust their quanta simultaneously at the same time.
+% The $n_w$-th core must wait for the preceding $n_w-1$ unicast preemptions.
+% The worst-case drift is the total time to serialize $n_w$ unicasts:
+% \begin{equation}
+% \Delta_{\text{seq}} = \underbrace{c_u}_{\text{Send}} + \underbrace{(n_w - 1) \cdot c_u}_{\text{Queuing}} = n_w \cdot c_u
+% \end{equation}
 
-\paragraph{Partial batching}
-The dispatcher partitions $n_w$ workers into $g$ groups, processing each group sequentially.
-The send overhead for each group is $c_b + \lceil \frac{n_w}{g} \cdot \rceil c_m$.
-In the worst case, all groups reach their quantum simultaneously, and the last group must wait for all preceding groups to be processed.
-The $g$-th group must wait for the preceding $g-1$ multicast preemptions.
-The worst-case drift is:
-\begin{align}
-\Delta_{\text{partial}}(g) &= \underbrace{c_b + \left\lceil \frac{n_w}{g} \right\rceil \cdot c_m}_{\text{Send}} + \underbrace{(g - 1) \cdot \left( c_b + \left\lceil \frac{n_w}{g} \right\rceil \cdot c_m \right) + q}_{\text{Queuing}} \\
-&= g \cdot c_b + n_w \cdot c_m + q
-\end{align}
+% \paragraph{Batched multicast}
+% The dispatcher broadcasts a single preemption signal to all $n_w$ cores at fixed intervals equal to the quantum $q$.
+% The send overhead is a function of a base multicast cost ($c_b$) and a per-core additional cost ($c_m$), expressed as $\mathit{Overhead}_{\text{batch}} = c_b + n_w \cdot c_m$.
+% In the worst case, a core reaching its quantum just after a batch is sent must wait until the next batch, incurring maximum scheduling delay equal to the quantum $q$.
+% The worst-case drift is:
+% \begin{equation}
+% \Delta_{\text{batch}} = \underbrace{(c_b + n_w \cdot c_m)}_{\text{Send}} + \underbrace{q}_{\text{Queuing}}
+% \end{equation}
+
+% \paragraph{Partial batching}
+% The dispatcher partitions $n_w$ workers into $g$ groups, processing each group sequentially.
+% The send overhead for each group is $c_b + \lceil \frac{n_w}{g} \cdot \rceil c_m$.
+% In the worst case, all groups reach their quantum simultaneously, and the last group must wait for all preceding groups to be processed.
+% The $g$-th group must wait for the preceding $g-1$ multicast preemptions.
+% The worst-case drift is:
+% \begin{align}
+% \Delta_{\text{partial}}(g) &= \underbrace{c_b + \left\lceil \frac{n_w}{g} \right\rceil \cdot c_m}_{\text{Send}} + \underbrace{(g - 1) \cdot \left( c_b + \left\lceil \frac{n_w}{g} \right\rceil \cdot c_m \right) + q}_{\text{Queuing}} \\
+% &= g \cdot c_b + n_w \cdot c_m + q
+% \end{align}
 
 \subsection{Core Efficiency}
 \label{subsec:core-efficiency}
