@@ -77,20 +77,56 @@ We later extend the model to consider multiple dispatcher cores for core efficie
 \subsection{Preemption Precision Drift}
 \label{subsec:preemption-precision-drift}
 
+Preemption precision reflects the system's ability to strictly enforce the target preemption quantum $q$ for worker cores.
+Drift occurs when preemptions are delayed beyond their ideal timing, leading to variability in task execution intervals.
+Significant drift can result in tasks on worker cores exceeding their allocated time slices, causing tail latency SLO violations.
+
 We first analyze the preemption precision drift for each policy as the number of worker cores increases.
-We define \textit{preemption precision drift} ($\delta_i$) as the difference between the ideal preemption time (i.e., preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
-This drift comes from two sources:
+We define \textit{preemption precision drift} ($\delta_i$) on worker cores $i$ as the difference between the ideal preemption time (i.e., preemption quantum $q$) and actual preemption time when the preemption is received by the core.
+Eq. \ref{drift_eq} breaks down the sources of $\delta_i$ into three components:
 \begin{enumerate*}
-    \item Send Overhead ($Overhead_{send}$): The time for dispatcher to send out the preemption.
-    \item Queuing Delay ($Overhead_{queue}$): The time a preemption waits to be sent by the dispatcher. This depends on the queue length of pending preemptions in the dispatcher.
-\end{enumerate*}
-Thus, the drift is expressed as:
+    \item Queuing Delay ($C_{queue}$): The time a preemption waits to be sent by the dispatcher. This depends on the queue length of pending preemptions in the dispatcher.
+    \item Dispatching Delay ($C_{dispatch}$): The time for dispatcher to sensd out the preemption.
+    \item Receiving Delay ($C_{receive}$): The time for the worker to receive and handle the preemption after it is sent by the dispatcher.
+\end{enumerate*}.
 \begin{equation}
-\delta = Overhead_{send} + Overhead_{queue}
+\delta_i = C_{queue} (i) + C_{dispatch} (n_w) + C_{receive} (n_w)
+\label{drift_eq}
 \end{equation}
 
-We now analyze the worst-case preemption precision drift ($\Delta$)
-under three policies for a system with $n_w$ worker cores.
+Using Eq. \ref{drift_eq}, we analyze the drift bounds $[\delta_{\min}, \delta_{\max}]$ to evaluate the precision of each policy.
+
+\paragraph{Sequential Unicast}
+The dispatcher preempts $n_w$ cores serially. 
+The drift depends entirely on the core's position $i$ in the dispatch order.
+\begin{itemize}
+    \item \textbf{Best Case ($i=1$):} The first core experiences zero queuing delay.
+    \begin{equation}
+    \delta_{\min} = c_u + C_{receive}
+    \end{equation}
+    \item \textbf{Worst Case ($i=n_w$):} The last core waits for all preceding dispatch operations.
+    \begin{equation}
+    \delta_{\max} = n_w \cdot c_u + C_{receive}
+    \end{equation}
+\end{itemize}
+The drift range grows linearly with $n_w$, indicating inherent \textit{unfairness}; higher-indexed cores suffer systematically worse preemption precision.
+
+\paragraph{Batched Multicast}
+The dispatcher issues multicast preemptions at fixed intervals of $q$. The drift depends on the alignment between the worker's quantum expiration and the batch clock.
+\begin{itemize}
+    \item \textbf{Best Case:} The worker reaches its quantum immediately before a batch.
+    \begin{equation}
+    \delta_{\min} = C_{dispatch}(n_w) + C_{receive}(n_w)
+    \end{equation}
+    \item \textbf{Worst Case:} The worker misses a batch and waits the full quantum.
+    \begin{equation}
+    \delta_{\max} = q + C_{dispatch}(n_w) + C_{receive}(n_w)
+    \end{equation}
+\end{itemize}
+While the worst-case drift includes the quantization penalty $q$, the variance ($\delta_{\max} - \delta_{\min} = q$) is independent of core count, making the policy \textit{fair} across all workers. However, both bounds rise with $n_w$ due to hardware scalability limits ($C_{receive}(n_w)$).
+
+
+We now analyze the worst-case preemption precision drift ($\Delta$) under three policies for a system with $n_w$ worker cores.
 
 \paragraph{Sequential unicast}
 The dispatcher sends individual preemption signals to each core.
