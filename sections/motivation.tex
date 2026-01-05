@@ -76,78 +76,97 @@ We later extend the model to consider multiple dispatcher cores for core efficie
 
 \subsection{Preemption Precision Drift}
 \label{subsec:preemption-precision-drift}
+Preemption precision reflects the system's ability to strictly enforce the target preemption quantum $q$ across all worker cores.
+Drift occurs when preemption events are delayed beyond their ideal expiration time, leading to variability in task execution intervals.
+Significant drift causes tasks on worker cores to exceed their allocated time slices, directly contributing to tail latency SLO violations.
 
-Preemption precision reflects the system's ability to strictly enforce the target preemption quantum $q$ for worker cores.
-Drift occurs when preemptions are delayed beyond their ideal timing, leading to variability in task execution intervals.
-Significant drift can result in tasks on worker cores exceeding their allocated time slices, causing tail latency SLO violations.
-
-We first analyze the preemption precision drift for each policy as the number of worker cores increases.
-We define \textit{preemption precision drift} ($\delta_i$) on worker cores $i$ as the difference between the ideal preemption time (i.e., preemption quantum $q$) and actual preemption time when the preemption is received by the core.
+We first analyze the preemption precision drift ($\delta_i$) for core $i$ in a system with $n_w$ worker cores.
+Formally, $\delta_i$ is defined as the difference between the ideal preemption time (i.e., preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
 Eq. \ref{drift_eq} breaks down the sources of $\delta_i$ into three components:
 \begin{enumerate*}
-    \item Queuing Delay ($C_{queue}$): The time a preemption waits to be sent by the dispatcher. This depends on the queue length of pending preemptions in the dispatcher.
-    \item Dispatching Delay ($C_{dispatch}$): The time for dispatcher to sensd out the preemption.
-    \item Receiving Delay ($C_{receive}$): The time for the worker to receive and handle the preemption after it is sent by the dispatcher.
+    \item Serialization Delay ($C_{serial}$): This is the serialization delay waiting for the dispatcher to send preemptions to preceding cores.
+    \item Dispatching Delay ($C_{dispatch}$): The time for dispatcher to send out the preemption.
+    \item Receiving Delay ($C_{receive}$): The time for the worker core to receive and handle the incoming preemption
 \end{enumerate*}.
 \begin{equation}
-\delta_i = C_{queue} (i) + C_{dispatch} (n_w) + C_{receive} (n_w)
+\delta_i = C_{serial} (i) + C_{dispatch} (n_w) + C_{receive} (n_w)
 \label{drift_eq}
 \end{equation}
 
 Using Eq. \ref{drift_eq}, we analyze the drift bounds $[\delta_{\min}, \delta_{\max}]$ to evaluate the precision of each policy.
+\yihan{Explain why we need this}
 
 \paragraph{Sequential Unicast}
-The dispatcher issues unicast preemptions to each core whose uses up its quantum one at a time.
-Both $C_{dispatch}$ and $C_{receive}$ are constant, independent of the number of worker cores.
-Thus, the drift of core $i$ depends primarily on the core's position $i$ in the dispatch order.
-\begin{itemize}
-    \item \textbf{Best Case ($i=1$):} The first core experiences zero queuing delay.
-    \begin{equation}
-    \delta_{\min} = c_u + C_{receive}
-    \end{equation}
-    \item \textbf{Worst Case ($i=n_w$):} The last core waits for all preceding dispatch operations.
-    \begin{equation}
-    \delta_{\max} = n_w \cdot c_u + C_{receive}
-    \end{equation}
-\end{itemize}
-The drift range grows linearly with $n_w$, indicating inherent \textit{unfairness};
-higher-indexed cores suffer systematically worse preemption precision.
+In this policy, the dispatcher tracks the quantum $q$ for each core independently and issues a unicast interrupt when a core exhausts its quantum.
+If multiple cores reach $q$ simultaneously, their preemptions are serialized.
+From \S~\ref{subsec:overhead-analysis}, both dispatch and receive costs are constant and independent of $n_w$.
+We denote them by $c_u$ and $c_r$, respectively.
 
-\paragraph{Batched Multicast}
-The dispatcher issues multicast preemptions to all cores at fixed intervals of $q$.
-Both $C_{dispatch}$ and $C_{receive}$ increase with the number of worker cores due to underlying hardware serialization.
-\yihan{function definition for C_dispatch and C_receive?}
-The drift depends on the alignment between the worker's quantum expiration and the batch clock.
 \begin{itemize}
-    \item \textbf{Best Case:} The worker reaches its quantum immediately before a batch.
-    \begin{equation}
-    \delta_{\min} = C_{dispatch}(n_w) + C_{receive}(n_w)
-    \end{equation}
-    \item \textbf{Worst Case:} The worker misses a batch and waits the full quantum.
-    \begin{equation}
-    \delta_{\max} = q + C_{dispatch}(n_w) + C_{receive}(n_w)
-    \end{equation}
+\item \textbf{Best Case ($i=1$):} The core is at the head of the dispatch queue.
+\begin{equation}
+\delta_{\min} = c_u + c_r
+\end{equation}
+\item \textbf{Worst Case ($i=n_w$):} The core is last in the dispatch order and must wait for all $n_w-1$ preceding unicast operations.
+\begin{equation}
+\delta_{\max} = n_w \cdot c_u + C_{receive}(1)
+\end{equation}
 \end{itemize}
-While the worst-case drift includes the quantization penalty $q$, the variance ($\delta_{\max} - \delta_{\min} = q$) is independent of core count, making the policy \textit{fair} across all workers. 
+Here, $c_u$ denotes the constant cost of a single unicast dispatch. The drift grows linearly ($O(n_w)$), indicating inherent unfairness: higher-indexed cores systematically suffer larger quantum violations due to serialization.
 
-\paragraph{Partial Batching}
-The dispatcher groups worker cores into $g$ groups and issues multicast preemptions to each group sequentially.
-% Within each group, preemptions are sent in parallel (e.g., via multicast to the subset of cores).
-% This policy introduces a tunable parameter $k$ that balances the serialization delay of unicast against the hardware scaling limits of full multicast.
-\begin{itemize}
-    \item \textbf{Best Case:} The worker belongs to the first group being dispatched.
-    The delay is limited to the formation and transmission of a single group.
-    \begin{equation}
-    \delta_{\min} = C_{dispatch}(k) + C_{receive}(k)
-    \end{equation}
-    \item \textbf{Worst Case:} The worker belongs to the last group (index $\lceil n_w/k \rceil$) when all cores require preemption simultaneously.
-    The core must wait for the serialization of all preceding groups.
-    \begin{equation}
-    \delta_{\max} = \left\lceil \frac{n_w}{k} \right\rceil \cdot c_{group} + C_{receive}(k)
-    \end{equation}
-\end{itemize}
-Here, $c_{group}$ represents the cost to dispatch a single group of size $k$.
-Partial Batching mitigates the linear unfairness of Sequential Unicast (reducing the slope by a factor of $k$) while keeping the hardware receive overhead $C_{receive}(k)$ lower than that of full Batched Multicast ($C_{receive}(n_w)$).
+
+% Both $C_{dispatch}$ and $C_{receive}$ are constant, independent of the number of worker cores.
+% Thus, the drift of core $i$ depends primarily on the core's position $i$ in the dispatch order.
+% \begin{itemize}
+%     \item \textbf{Best Case ($i=1$):} The first core experiences zero queuing delay.
+%     \begin{equation}
+%     \delta_{\min} = c_u + C_{receive}
+%     \end{equation}
+%     \item \textbf{Worst Case ($i=n_w$):} The last core waits for all preceding dispatch operations.
+%     \begin{equation}
+%     \delta_{\max} = n_w \cdot c_u + C_{receive}
+%     \end{equation}
+% \end{itemize}
+% The drift range grows linearly with $n_w$, indicating inherent \textit{unfairness};
+% higher-indexed cores suffer systematically worse preemption precision.
+
+% \paragraph{Batched Multicast}
+% The dispatcher issues multicast preemptions to all cores at fixed intervals of $q$.
+% Both $C_{dispatch}$ and $C_{receive}$ increase with the number of worker cores due to underlying hardware serialization.
+% \yihan{function definition for C_dispatch and C_receive?}
+% The drift depends on the alignment between the worker's quantum expiration and the batch clock.
+% \begin{itemize}
+%     \item \textbf{Best Case:} The worker reaches its quantum immediately before a batch.
+%     \begin{equation}
+%     \delta_{\min} = C_{dispatch}(n_w) + C_{receive}(n_w)
+%     \end{equation}
+%     \item \textbf{Worst Case:} The worker misses a batch and waits the full quantum.
+%     \begin{equation}
+%     \delta_{\max} = q + C_{dispatch}(n_w) + C_{receive}(n_w)
+%     \end{equation}
+% \end{itemize}
+% While the worst-case drift includes the quantization penalty $q$, the variance ($\delta_{\max} - \delta_{\min} = q$) is independent of core count, making the policy \textit{fair} across all workers. 
+
+% \paragraph{Partial Batching}
+% The dispatcher groups worker cores into $g$ groups and issues multicast preemptions to each group sequentially.
+% The dispatcher sends multicast preemption to all workers in the same group at once every quantum.
+% Between groups, the dispatcher preempts each group at fixed intervals of $q$ sequentially.
+% % Within each group, preemptions are sent in parallel (e.g., via multicast to the subset of cores).
+% % This policy introduces a tunable parameter $k$ that balances the serialization delay of unicast against the hardware scaling limits of full multicast.
+% \begin{itemize}
+%     \item \textbf{Best Case:} The worker belongs to the first group being dispatched.
+%     The delay is limited to the formation and transmission of a single group.
+%     \begin{equation}
+%     \delta_{\min} = C_{dispatch}(k) + C_{receive}(k)
+%     \end{equation}
+%     \item \textbf{Worst Case:} The worker belongs to the last group (index $\lceil n_w/k \rceil$) when all cores require preemption simultaneously.
+%     The core must wait for the serialization of all preceding groups.
+%     \begin{equation}
+%     \delta_{\max} = \left\lceil \frac{n_w}{k} \right\rceil \cdot c_{group} + C_{receive}(k)
+%     \end{equation}
+% \end{itemize}
+% Here, $c_{group}$ represents the cost to dispatch a single group of size $k$.
+% Partial Batching mitigates the linear unfairness of Sequential Unicast (reducing the slope by a factor of $k$) while keeping the hardware receive overhead $C_{receive}(k)$ lower than that of full Batched Multicast ($C_{receive}(n_w)$).
 
 % We now analyze the worst-case preemption precision drift ($\Delta$) under three policies for a system with $n_w$ worker cores.
 
