@@ -43,13 +43,13 @@ as core counts grow, the overhead of issuing preemptions increases, forcing a tr
 This trade-off can be illustrated by two extreme dispatching policies:
 \begin{enumerate*}[label=(\roman*)]
   \item \textit{Sequential unicast}, where the dispatcher preempts individual cores one at a time using unicast IPIs, and
-  \item \textit{Batched multicast}, where the dispatcher preempts all cores at once using multicast IPIs
+  \item \textit{Batched multicast}, where the dispatcher preempts all cores at once using multicast IPIs at fixed intervals equal to the preemption quantum.
 \end{enumerate*}.
 % Sequential unicast policy enables precise per-core control over preemption timing, allowing each worker to be preempted exactly when needed.
 % However, this approach requires the dispatcher to track and interrupt each core independently, incurring overhead that grows linearly with the number of cores.
 % In contrast, batched multicast mitigates this overhead by sending a single interrupt to multiple cores at once, yet the cost still grows linearly to the number of batched cores and worker cores must wait for the next batch to be preempted.
 The policy design space is infinite, but essentially trades off preemption precision against preemption overhead between these two extremes.
-To prove this, we also have a \textit{partial batching policy}, where the dispatcher issues preemptions to groups of worker cores via multicast IPIs.
+To prove this, we also have a \textit{partial batching policy}, where the dispatcher issues preemptions to groups of worker cores via multicast IPIs every preemption quantum.
 
 We use an analytical model to illustrate the scalability dilemma of centralized preemption dispatchers.
 We consider a system with $N$ cores in total.
@@ -116,6 +116,7 @@ higher-indexed cores suffer systematically worse preemption precision.
 \paragraph{Batched Multicast}
 The dispatcher issues multicast preemptions to all cores at fixed intervals of $q$.
 Both $C_{dispatch}$ and $C_{receive}$ increase with the number of worker cores due to underlying hardware serialization.
+\yihan{function definition for C_dispatch and C_receive?}
 The drift depends on the alignment between the worker's quantum expiration and the batch clock.
 \begin{itemize}
     \item \textbf{Best Case:} The worker reaches its quantum immediately before a batch.
@@ -130,11 +131,9 @@ The drift depends on the alignment between the worker's quantum expiration and t
 While the worst-case drift includes the quantization penalty $q$, the variance ($\delta_{\max} - \delta_{\min} = q$) is independent of core count, making the policy \textit{fair} across all workers. 
 
 \paragraph{Partial Batching}
-The dispatcher aggregates pending preemptions into groups of size $k$ ($1 < k < n_w$) and issues them sequentially.
-Within each group, preemptions are sent in parallel (e.g., via multicast to the subset of cores).
-This policy introduces a tunable parameter $k$ that balances the serialization delay of unicast against the hardware scaling limits of full multicast.
-Unlike Batched Multicast, Partial Batching is event-driven and does not wait for a fixed clock interval $q$, thereby avoiding the quantization penalty.
-
+The dispatcher groups worker cores into $g$ groups and issues multicast preemptions to each group sequentially.
+% Within each group, preemptions are sent in parallel (e.g., via multicast to the subset of cores).
+% This policy introduces a tunable parameter $k$ that balances the serialization delay of unicast against the hardware scaling limits of full multicast.
 \begin{itemize}
     \item \textbf{Best Case:} The worker belongs to the first group being dispatched.
     The delay is limited to the formation and transmission of a single group.
