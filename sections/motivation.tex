@@ -17,12 +17,14 @@ For multicast-based mechanisms (multicast IPI), the dispatcher issues a single h
 
 \yihan{SYNC, ASYNC, RECV definitions?}
 
-\paragraph{Insight\#1: Preemption issuing overhead at sender side grows with core count}
+We make the following observations from the results in Figure~\ref{fig:cost-of-preemption-mechanisms}:
+
+\paragraph{Preemption issuing overhead at sender side grows with core count}
 \yihan{Signal? setup overhead for unicast IPI. propagation delay for multicast IPI. cache?}
 
-\paragraph{Insight\#2: Propagation delay grows with core count}
+\paragraph{Hardware interconnect contention increases propagation delay}
 
-\paragraph{Insight\#3: Hyperthreading and NUMA effects are non-negligible for cache-coherent messaging}
+\paragraph{Hyperthreading and NUMA effects are non-negligible for cache-coherent messaging}
 
 \begin{figure}
     \centering
@@ -110,7 +112,7 @@ We represent the objective of maximizing core efficiency as follows:
 \end{equation}
 
 From Eq. \ref{drift-eq} and Eq. \ref{core-efficiency-eq}, we analyze how increasing core counts impact preemption delay and core efficiency under different dispatching policies in the following sections.
-We have two key observations:
+We have two key findings:
 \paragraph{Preemption delay grows with core count, exceeding the quantum at scale}
 \paragraph{Core efficiency is sacrificed to bound preemption delay}
 
