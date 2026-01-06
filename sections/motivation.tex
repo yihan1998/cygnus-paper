@@ -3,7 +3,7 @@ We first analyze the overhead of preemption primitives commonly used in existing
 Based on these empirical measurements, we construct an analytical model to formalize the scalability limits of a centralized dispatcher (\S~\ref{subsec:model-setup}).
 We then use the model to evaluate how increasing the core count impacts system performance on preemption delay (\S~\ref{subsec:preemption-delay}) and core efficiency (\S~\ref{subsec:core-efficiency}).
 
-\subsection{Overhead Analysis of Common Preemption Mechanisms}
+\subsection{Overhead in Common Preemption Primitives}
 \label{subsec:overhead-analysis}
 
 \paragraph{Experimental setup}
@@ -57,28 +57,36 @@ In the following sections, we focus on two dispatching policies in the spectrum 
 
 We consider the source of the preemption delay ($\delta$) into four components:
 \begin{enumerate*}
-    \item Serialization ($C_{serial}$): This is the serialization delay waiting for the dispatcher to issue preemptions to preceding cores.
+    \item Wait time ($C_{wait}$): The time a worker core waits before its turn to be preempted.
     \item Preemption issuing ($C_{issue}$): The time for the dispatcher to issue the preemption.
     \item Propagation ($C_{prop}$): The time for the preemption to propagate from the dispatcher to the worker core via hardware interconnect.
     \item Preemption receiving ($C_{recv}$): The time for the worker core to receive and handle the incoming preemption
 \end{enumerate*}.
 
 \begin{equation}
-\delta = C_{serial} + C_{issue} + C_{prop} + C_{recv}
+\delta = C_{wait} + C_{issue} + C_{prop} + C_{recv}
 \label{drift-eq}
 \end{equation}
 
 We further break down the following costs using our empirical measurements from \S~\ref{subsec:overhead-analysis}:
-The serialization delay ($C_{serial}$) depends on the dispatch policy, which we leave to \S~\ref{subsec:preemption-delay} for detailed discussion.
+The wait time ($C_{wait}$) depends on the dispatching policy.
+In sequential unicast, the cost grows linearly with the core's position in the dispatch order ($i$), modeled as $C_{wait} (i) = (i-1) \cdot c_{u}$, where $c_{u}$ is the constant cost of a single unicast dispatch.
+In batched multicast, the cost is between zero (best case) and the quantum $q$ (worst case), depending on the alignment between the worker's quantum expiration and the batch clock.
 The preemption issuing cost ($C_{issue}$) is fixed at $c_{d}^{u}$ per preemption for unicast policies. 
 For multicast policies, it increases with the number of target cores ($n_{target}$) due to underlying hardware serialization, modeled as the sum of a base setup cost $c_{d}^{b}$ and an additional per-core cost $c_{d}^{m}$.
 The propagation delay ($C_{prop}$) is a function of $n_{target}$ due to hardware interconnect contention. We denote this as the sum of a base propagation cost $c_{p}^{b}$ and an additional per-core penalty $c_{p}^{m}$. 
 The receiving cost ($C_{recv}$) is considered to be a constant $c_{r}$, representing the fixed overhead of interrupt handling and context switching.
 
 \begin{equation}
+C_{wait} (n_w) = \begin{cases}
+\frac{n_w-1}{2} \cdot c_{issue}^{u} & \text{for sequential unicast} \\[8pt]
+\frac{q}{2} & \text{for batched multicast}
+\end{cases}
+\end{equation}
+\begin{equation}
 C_{dispatch} (n_w) = \begin{cases}
-c_{d}^{u} & \text{for unicast} \\
-c_{d}^{b} + n_w \cdot c_{d}^{m} & \text{for multicast}
+c_{d}^{u} & \text{for sequential unicast} \\
+c_{d}^{b} + n_w \cdot c_{d}^{m} & \text{for batched multicast}
 \end{cases}
 \end{equation}
 \begin{equation}
@@ -101,22 +109,27 @@ We represent the objective of maximizing core efficiency as follows:
 \label{core-efficiency-eq}
 \end{equation}
 
-\subsection{Preemption Delay}
-\label{subsec:preemption-delay}
-Preemption delay ($\delta$) is the fundamental cause of preemption precision drift in a centralized dispatcher architecture.
-Ideally, a worker core would be preempted exactly at the end of its quantum ($q$), resulting in zero drift. 
-However, in practice, preemptions are delayed due to software and hardware overheads described in §\ref{subsec:model-setup}.
-As these overheads grow with the number of worker cores ($n_w$), preemption precision drift also increases with system scale, causing potential tail latency SLO violations.
+From Eq. \ref{drift-eq} and Eq. \ref{core-efficiency-eq}, we analyze how increasing core counts impact preemption delay and core efficiency under different dispatching policies in the following sections.
+We have two key observations:
+\paragraph{Preemption delay grows with core count, exceeding the quantum at scale}
+\paragraph{Core efficiency is sacrificed to bound preemption delay}
 
-Different dispatching policies have varying trades-offs between software-driven serialization and hardware-driven propagation delay.
+% \subsection{Preemption Delay}
+% \label{subsec:preemption-delay}
+% Preemption delay ($\delta$) is the fundamental cause of preemption precision drift in a centralized dispatcher architecture.
+% Ideally, a worker core would be preempted exactly at the end of its quantum ($q$), resulting in zero drift. 
+% However, in practice, preemptions are delayed due to software and hardware overheads described in §\ref{subsec:model-setup}.
+% As these overheads grow with the number of worker cores ($n_w$), preemption precision drift also increases with system scale, causing potential tail latency SLO violations.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{graphs/bg_preemption_delay.pdf}
-    \Description{Preemption delay analysis of different dispatching policies.}
-    \caption{Preemption delay ($\delta$) analysis of different dispatching policies as the number of worker cores increases. The solid lines represent the best-case delay, while the dashed lines represent the worst-case delay.}
-    \label{fig:preemption-drift}
-\end{figure}
+% Different dispatching policies have varying trades-offs between software-driven serialization and hardware-driven propagation delay.
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=\linewidth]{graphs/bg_preemption_delay.pdf}
+%     \Description{Preemption delay analysis of different dispatching policies.}
+%     \caption{Preemption delay ($\delta$) analysis of different dispatching policies as the number of worker cores increases. The solid lines represent the best-case delay, while the dashed lines represent the worst-case delay.}
+%     \label{fig:preemption-drift}
+% \end{figure}
 % We first analyze the preemption precision drift ($\delta_i$) for core $i$ in a system with $n_w$ worker cores.
 % Formally, $\delta_i$ is defined as the difference between the ideal preemption time (i.e., preemption quantum $q$) and actual preemption time when the preemption is received by core $i$.
 % Eq. \ref{drift_eq} breaks down the sources of $\delta_i$ into three components:
@@ -237,17 +250,36 @@ Different dispatching policies have varying trades-offs between software-driven 
 % &= g \cdot c_b + n_w \cdot c_m + q
 % \end{align}
 
-\subsection{Core Efficiency}
-\label{subsec:core-efficiency}
+% \subsection{Core Efficiency}
+% \label{subsec:core-efficiency}
 
-We then analyze the core efficiency for each policy under the constraint of a fixed total core count $N$, partitioned into $n_d$ dispatcher cores and $n_w$ worker cores.
+% We then analyze the core efficiency for each policy under the constraint of a fixed total core count $N$, partitioned into $n_d$ dispatcher cores and $n_w$ worker cores.
 
 \begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{graphs/bg_core_efficiency.pdf}
-    \Description{Core efficiency analysis of different dispatching policies.}
-    \caption{Core efficiency ($\eta$) analysis of different dispatching policies as the number of worker cores increases. The solid lines represent the best-case efficiency, while the dashed lines represent the worst-case efficiency.}
-    \label{fig:core-efficiency}
+    % Legend
+    \begin{subfigure}{0.8\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{graphs/bg_core_efficiency_legend.pdf}
+        \vspace{-0.8em} % Tighten space below legend
+    \end{subfigure}
+
+    % Subfigures
+    \begin{subfigure}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{graphs/bg_core_efficiency_seq.pdf}
+        \Description{Core efficiency analysis of sequential unicast dispatching policy.}
+        \caption{Sequential unicast policy.}
+        \label{fig:core-efficiency-seq}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{graphs/bg_core_efficiency_batch.pdf}
+        \Description{Core efficiency analysis of batched multicast dispatching policy.}
+        \caption{Batched multicast policy.}
+        \label{fig:core-efficiency-batch}
+    \end{subfigure}
 \end{figure}
 
 % First, we define the \textit{dispatcher utilization} ($\rho$) as the fraction of time the dispatcher spends sending preemptions within each quantum.
