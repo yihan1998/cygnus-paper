@@ -1,5 +1,5 @@
-In this section, we analyze the scalability challenges inherent in centralized preemption architectures. 
-We first analyze the overhead of preemption mechanisms commonly used in existing dataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent messaging (\S~\ref{subsec:overhead-analysis}).
+In this section, we analyze the scalability challenges in using a centralized dispatcher to preempt remote worker cores.
+We first analyze the overhead of preemption primitives commonly used in existing dataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent messaging (\S~\ref{subsec:overhead-analysis}).
 Based on these empirical measurements, we construct an analytical model to formalize the scalability limits of a centralized dispatcher (\S~\ref{subsec:model-setup}).
 We then use the model to evaluate how increasing the core count impacts system performance on preemption delay (\S~\ref{subsec:preemption-delay}) and core efficiency (\S~\ref{subsec:core-efficiency}).
 
@@ -10,10 +10,12 @@ We then use the model to evaluate how increasing the core count impacts system p
 We use a dual-socket server equipped with two 32-core(64-hyperthread) Intel Xeon Gold 6548Y+ CPUs (@2.5 GHz) and 256 GB of RAM. 
 The machine runs Ubuntu 24.04.1 LTS with Linux kernel 6.8.0.
 
-We implement a microbenchmark to measure the sending and receiving costs in POSIX signals, IPIs, and cache-coherent messaging.
+We implement a microbenchmark to quantify the overheads in three preemption delivery mechanisms: POSIX signals, IPIs, and cache-coherent messaging.
 In the benchmark, the dispatcher runs on a dedicated core to preempt all worker cores, while the workers spin on individual cores.
-For preemption that performs unicast delivery (i.e., signal, unicast IPI, and cache-coherent messaging), the dispatcher iterates through each worker core to send a preemption.
-For preemption that performs multicast delivery (i.e., multicast IPI), the dispatcher sends a single preemption to all workers at once.
+For unicast-based mechanisms (signals, unicast IPIs, and cache-coherent messaging), the dispatcher sends individual preemption events to each worker sequentially.
+For multicast-based mechanisms (multicast IPI), the dispatcher issues a single hardware command to preempt all workers simultaneously.
+
+\yihan{SYNC, ASYNC, RECV definitions?}
 
 \paragraph{Insight\#1: Preemption issuing overhead at sender side grows with core count}
 \yihan{Signal? setup overhead for unicast IPI. propagation delay for multicast IPI. cache?}
@@ -91,11 +93,11 @@ We define the core efficiency ($\eta$) as the ratio between the number of worker
 Ideally, at the premise of maintaining preemption precision, we want to maximize $\eta$ with minimal number of dispatcher cores ($n_d$).
 However, as core counts grow, the preemption delay increases proportionally, potentially violating the target preemption quantum $q$.
 To compensate, the system must dedicate more cores to the dispatcher, reducing the number of cores available for applications.
-
+We represent the objective of maximizing core efficiency as follows:
 \begin{equation} 
 \begin{aligned} 
 & \text{Maximize} & \eta & = \frac{n_w}{N} \\
-& \text{Subject to} & \delta_i & \le q, \quad \forall i \in {1, \dots, n_w} 
+& \text{Subject to} & \delta_i & \le q, \quad \forall i \in {1, \dots, n_w} \\
 \end{aligned} 
 \label{core-efficiency-eq}
 \end{equation}
