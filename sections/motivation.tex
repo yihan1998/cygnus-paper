@@ -49,11 +49,10 @@ Two metrics are critical for predictable and bounded tail latency:
 \end{enumerate*}.
 
 Even though the centralized dispatcher could have numerous ways to implement preemption policy, the design spectrum essentially trade off between preemption delay and core efficiency.
-In the following sections, we focus on three dispatching policies in the spectrum to illustrate this trade-off:
+In the following sections, we focus on two dispatching policies in the spectrum to illustrate this trade-off:
 \begin{enumerate*}[label=(\roman*)]
   \item \textit{Sequential unicast}, where the dispatcher preempts individual cores one at a time using unicast IPIs to precisely preempt each core,
   \item \textit{Batched multicast}, where the dispatcher preempts all cores at once using multicast IPIs at fixed intervals equal to the preemption quantum
-  \item \textit{Partial batching}, where the dispatcher issues preemptions to groups of worker cores via multicast IPIs every preemption quantum
 \end{enumerate*}.
 
 We consider the source of the preemption delay ($\delta$) into four components:
