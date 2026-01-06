@@ -255,25 +255,24 @@ We have two key observations:
 
 % We then analyze the core efficiency for each policy under the constraint of a fixed total core count $N$, partitioned into $n_d$ dispatcher cores and $n_w$ worker cores.
 
-\begin{figure}
+\begin{figure}[t]
     \centering
     % Legend
     \begin{subfigure}{0.8\linewidth}
         \centering
         \includegraphics[width=\linewidth]{graphs/bg_core_efficiency_legend.pdf}
-        \vspace{-0.8em} % Tighten space below legend
+        \vspace{-20pt} % Tighten space below legend
     \end{subfigure}
 
     % Subfigures
-    \begin{subfigure}{0.48\linewidth}
+    \begin{subfigure}{0.495\linewidth}
         \centering
         \includegraphics[width=\linewidth]{graphs/bg_core_efficiency_seq.pdf}
         \Description{Core efficiency analysis of sequential unicast dispatching policy.}
         \caption{Sequential unicast policy.}
         \label{fig:core-efficiency-seq}
     \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.48\linewidth}
+    \begin{subfigure}{0.495\linewidth}
         \centering
         \includegraphics[width=\linewidth]{graphs/bg_core_efficiency_batch.pdf}
         \Description{Core efficiency analysis of batched multicast dispatching policy.}
