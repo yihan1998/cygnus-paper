@@ -40,11 +40,14 @@ Recklessly exposing it to untrusted userspace creates opportunities for maliciou
 
 To mitigate the above threats, \kernel employs a combination of hardware-assisted isolation, strict identity verification, and control-flow integrity mechanisms.
 
-To address C1 (Spatial Isolation), \kernel uses Intel MPK to partition the single process address space into two hardware-enforced domains.
-The Tenant Ring contains all untrusted application code and data, as well as the normal userspace components of \libos for system call handling and user thread management.
-The Shadow Ring contains the trusted scheduler, its private state, and text segment that contains interface code for interacting with the kernel.
-During a trusted initialization phase, the \kmod configures this partition and seals it by installing a \texttt{seccomp} filter that permanently revokes the \texttt{pkey\_*} system call interface. 
-This makes the MPK domain assignment immutable, preventing a tenant from altering the memory map to gain entry.
+To address C\#1, \kernel uses Intel MPK to partition the single process address space into two hardware-enforced domains.
+The Tenant Ring contains all untrusted application code and data, as well as the normal userspace components of the library OS for system call handling and user thread management.
+The Shadow Ring contains the trusted scheduler (\schedcore), its private state, and its text segment. 
+A critical security requirement is that the \texttt{WRPKRU} instruction, which switches access to the Shadow Ring, must exist only within the verified scheduler code.
+To enforce this, the \kmod performs a \textit{load-time binary verification} during initialization. 
+It scans the loaded \texttt{.text} segment of the untrusted application binary for the opcode sequence of the \texttt{WRPKRU} instruction. 
+The verification passes only if the opcode appears exactly once at the expected offset within the secure trampoline function, confirming that no unauthorized instance has been injected. 
+Following successful attestation, the \kmod assists in configuring the MPK partition and seals it by installing a \texttt{seccomp} filter. This filter permanently revokes the \texttt{pkey\_*} system call interface, rendering the MPK domain assignment immutable and preventing a tenant from altering the memory map to gain entry.
 
 To address C\#2, \kernel introduces a Double-Gate security model to goven the interactions between the untrusted tenant, the trusted scheduler, and the kernel.
 This model ensures that while the \schedcore operates with direct hardware access, the untrusted tenant is confined to its domain, and all cross-privilege operations are authenticated and integrity-checked.
