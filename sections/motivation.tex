@@ -1,9 +1,9 @@
 In this section, we analyze the scalability challenges in using a centralized dispatcher to preempt remote worker cores.
-We first analyze the overhead of preemption primitives commonly used in existing dataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent messaging (\S~\ref{subsec:overhead-analysis}).
+We first analyze the overhead of preemption mechanisms commonly used in existing dataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent messaging (\S~\ref{subsec:overhead-analysis}).
 Based on these empirical measurements, we construct an analytical model to formalize the scalability limits of a centralized dispatcher (\S~\ref{subsec:model-setup}).
 We then use the model to evaluate how increasing the core count impacts system performance on preemption delay (\S~\ref{subsec:preemption-delay}) and core efficiency (\S~\ref{subsec:core-efficiency}).
 
-\subsection{Overhead in Common Preemption Primitives}
+\subsection{Preemption Overhead}
 \label{subsec:overhead-analysis}
 
 \paragraph{Experimental setup}
