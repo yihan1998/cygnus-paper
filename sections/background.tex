@@ -1,7 +1,7 @@
 % We first profile the overhead of various user-level preemption mechanisms used in existingdataplane OSes, including POSIX signals, Inter-Processor Interrupts (IPIs), and cache-coherent message passing (\S~\ref{subsec:preemption-in-dataplane-os}).
 % Based on these measurements, we use an analytical model to illustrate the scalability dilemma of using a centralized dispatcher to preempt remote worker cores (\S~\ref{subsec:scalability-dilemma}).
 
-In this section, we categorize existing dataplane OSes based on their preemption models (\S~\ref{subsec:existing-preemption-models}) and isolation models (\S~\ref{subsec:existing-isolation-models}) in table \ref{tab:comparison}.
+In this section, we categorize existing dataplane OSes based on their preemption models (\S~\ref{subsec:existing-preemption-models}) and isolation mechanisms (\S~\ref{subsec:existing-isolation-mechanisms}) in table \ref{tab:comparison}.
 
 \begin{table*}[t]
 \centering
@@ -114,8 +114,8 @@ This mechanism relies on the application to periodically poll the cache line for
 While this reduces preemption overhead, it risks missing preemption deadlines.
 If the compiler failed to insert these polling points at appropriate locations, for instance in third-party libraries, the application would not be preempted in time, leading to potential tail latency SLO violations.
 
-\subsection{Existing Isolation Models}
-\label{subsec:existing-isolation-models}
+\subsection{Existing Isolation Mechanisms}
+\label{subsec:existing-isolation-mechanisms}
 
 \paragraph{Between application and scheduler}
 Many dataplane OSes~\cite{kaffes2019shinjuku,zhang2021demikernel,iyer2023achieving} adopt \textit{single address space} architecture where the application and scheduler share the same memory space.

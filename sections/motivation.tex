@@ -3,24 +3,26 @@ We first analyze the overhead of preemption mechanisms commonly used in existing
 Based on these empirical measurements, we construct an analytical model to formalize the scalability limits of a centralized dispatcher (\S~\ref{subsec:model-setup}).
 We then use the model to evaluate how increasing the core count impacts system performance on preemption delay (\S~\ref{subsec:preemption-delay}) and core efficiency (\S~\ref{subsec:core-efficiency}).
 
-\subsection{Preemption Overhead}
+\subsection{Overhead Analysis of Preemption Mechanisms}
 \label{subsec:overhead-analysis}
 
 \paragraph{Experimental setup}
 We use a dual-socket server equipped with two 32-core(64-hyperthread) Intel Xeon Gold 6548Y+ CPUs (@2.5 GHz) and 256 GB of RAM. 
 The machine runs Ubuntu 24.04.1 LTS with Linux kernel 6.8.0.
-
 We implement a microbenchmark to quantify the overheads in three preemption delivery mechanisms: POSIX signals, IPIs, and cache-coherent messaging.
 In the benchmark, the dispatcher runs on a dedicated core to preempt all worker cores, while the workers spin on individual cores.
 For unicast-based mechanisms (signals, unicast IPIs, and cache-coherent messaging), the dispatcher sends individual preemption events to each worker sequentially.
 For multicast-based mechanisms (multicast IPI), the dispatcher issues a single hardware command to preempt all workers simultaneously.
 
-\yihan{SYNC, ASYNC, RECV definitions?}
-
 We make the following observations from the results in Figure~\ref{fig:cost-of-preemption-mechanisms}:
 
 \paragraph{Preemption issuing overhead at sender side grows with core count}
-\yihan{Signal? setup overhead for unicast IPI. propagation delay for multicast IPI. cache?}
+For unicast mechanisms (Signals and Unicast IPIs), the dispatch cost scales linearly with the number of workers ($O(N)$) because the dispatcher must execute a software loop to signal each core individually.
+POSIX signals incur the highest overhead due to the expensive locking of \texttt{task\_struct}.
+For Multicast IPIs, the total dispatch cost still grows linearly with core count, albeit at a lower rat than Unicast IPIs since the hardware IPI command only needs to be issued once.
+However, the per-core issue cost drops at first, but remains stable after 16 cores.
+The reason is that x2APIC runs in cluster mode, where cores are grouped into clusters of 16 cores.
+The dispatcher only needs to send one IPI per cluster, yet it still serializes the IPI issuing between clusters.
 
 \paragraph{Hardware interconnect contention increases propagation delay}
 
