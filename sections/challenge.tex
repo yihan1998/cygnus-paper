@@ -1,53 +1,68 @@
 Our goal is to design a new dataplane operating system architecture that enables scalable, microsecond-scale preemptive scheduling on modern multi-core servers.
-Achieving this goal requires reconciling a fundamental tension: delivering near bare-metal performance for fine-grained scheduling, while ensuring system safety when exposing low-level hardware primitives (e.g., LAPIC timers) to untrusted userspace schedulers.
-We identify two major challenges in bridging this gap:
+Achieving this requires reconciling a fundamental tension: delivering the near bare-metal performance required for fine-grained scheduling, while ensuring rigorous system safety when exposing low-level hardware primitives (e.g., LAPIC timers) to untrusted userspace components.
+We identify two major barriers to bridging this gap:
 
-\paragraph{C\#1: Virtualization-based isolation incurs prohibitive overhead for microsecond-scale scheduling.}
-Existing virtualization techniques (e.g., APICv) provide strong isolation between physical hardware and untrusted userspace code.
-However, these mechanisms introduce substantial overheads on critical datapath operations, making them unsuitable for microsecond-scale preemptive scheduling.
-Table \ref{tab:operation-overhead} quantifies the overhead of several key operations required for APIC-based preemptive scheduling on bare metal and under virtualization.
-A bare-metal \texttt{SYSCALL} completes in 151 cycles, while the equivalent VMCALL is 43$\times$ higher even with APICv.
-Arming a local APIC timer with \texttt{hrtimer\_start} takes 490 cycles on bare metal, but 11.5$\times$ higher with APICv and 20$\times$ higher without APICv.
-Interrupt delivery in bare metal and with APICv are comparable since APICv avoids \texttt{VMEXIT} and \texttt{VMENTRY}.
-But the delivery cost soars 2$\times$ higher without APICv.
+\paragraph{C1: Virtualization-based isolation incurs prohibitive overhead for microsecond-scale scheduling.}
+Existing virtualization techniques (e.g., KVM with APICv) provide robust isolation between physical hardware and untrusted code.
+However, the architectural cost of maintaining this isolation boundary is incompatible with microsecond-scale scheduling intervals.
+Table \ref{tab:operation-overhead} quantifies the overhead of key preemption primitives on bare metal versus virtualization.
+While hardware assists like APICv optimize interrupt delivery (i.e., avoiding \texttt{VMEXIT} and \texttt{VMENTER}), they fail to optimize privileged configuration operations.
+For regular context switches, the overhead increases from 151 cycles on bare metal to over 6,400 cycles with APICv.
+For timer arming, which happens at every context switch, the overhead is 490 cycles on bare metal but skyrockets to over 5,600 cycles even with APICv, due to the unavoidable \texttt{VMEXIT}/\texttt{VMENTER}.
+For a system targeting a 5 $\mu$s timeslice (approx. 12,500 cycles), spending nearly 50\% of the quantum just to program the timer is unacceptable.
+For interrupt delivery, APICv reduces the overhead to 2,717 cycles by posted interrupts, reaching near bare-metal performance.
 
+\yihan{Need to update the table}
 \begin{table}[h]
 \centering
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{@{} l ccc @{}}
+\begin{tabular}{lccc}
 \toprule
 \multirow{2}{*}{\textbf{Operation}} & \multirow{2}{*}{\textbf{Bare Metal}}  & \multicolumn{2}{c}{\textbf{Virtualization}} \\ \cmidrule(l){3-4} 
                                     & & \small with APICv     & \small w/o APICv     \\
 % \midrule
 Mode Switch                & 151            & 6,439          & 10,108            \\
-Timer Arming                        & 490            & 5,651          & 9,825             \\
-Interrupt Delivery                 & 2,960          & 2,717          & 6,305             \\ \bottomrule
+Timer Setup and Fire (Immediate)                        & 3,496            & 5,539          & 10,854             \\
+Timer Setup and Fire (EOI)                        & 3,496            & 435          & 4,381             \\
+% Interrupt Delivery                 & 2,960          & 2,717          & 6,305             \\
+\bottomrule
 \end{tabular}
-}
-\caption{Average operation latency in CPU cycles measured on a 2.5GHz Intel Xeon Gold 6548Y running Linux 6.8. 
-Mode Switch uses \texttt{getpid()} to represent a typical syscall or VM exit/entry.
-Timer Arming uses \texttt{hrtimer\_start()} on bare metal and \texttt{wrmsr()} to program a virtual APIC timer.
-Interrupt Delivery measures the time to deliver a timer interrupt to an empty handler in the kernel or virtualized environment.}
+\caption{Latency (in cycles) of key preemption primitives on a 2.5GHz Intel Xeon Gold 6548Y (Linux 6.8).\textit{Context Switch} is proxied by a syscall (\texttt{getpid}) vs. a VMCALL.\textit{Timer Arming} compares \texttt{hrtimer\_start} (bare metal) vs. \texttt{wrmsr} to the virtual APIC.\textit{Interrupt Delivery} measures the latency from timer expiration to handler entry.}
 \label{tab:operation-overhead}
 \end{table}
 
-\paragraph{C\#2: Safely multiplexing system-critical hardware between the kernel and untrusted userspace.}
-Granting userspace schedulers direct access to system-critical hardware resources risks breaking isolation guarantees and compromising overall system integrity.
-Unlike I/O devices, which can often be assigned exclusively to a single VM, LAPIC timers remain integral to core system functions, including watchdogs and kernel scheduling.
-Recklessly exposing it to untrusted userspace creates opportunities for malicious or buggy application code to disrupt system operation, for example by causing softlocks or triggering preemption storms.
+\paragraph{C2: Bypassing virtualization is unsafe due to the lack hardware multiplexing mechanism for system-critical resources.}
+While modern processors provide IOMMUs to safely expose PCIe devices (e.g., NICs, GPUs) to userspace, no equivalent hardware mechanism exists for core-local resources like the LAPIC.
+The LAPIC is a privileged component integral to system stability; it manages not just user preemption, but also kernel watchdog timers and IPIs.
+Consequently, standard OS kernels strictly prohibit userspace access to the LAPIC.
+Bypassing this restriction to grant an untrusted userspace scheduler direct access creates severe safety risks: a malicious or buggy application could misconfigure the timer to starve the kernel, trigger interrupt storms, or soft-lock the CPU, compromising the integrity of the entire server.
 
 \subsection{\kernel Approach}
+To overcome these challenges, \kernel introduces a new isolation model that achieves the performance of bare metal with the safety of virtualization.
+Our approach relies on two key architectural abstractions:
 
-To mitigate the above threats, \kernel employs a combination of hardware-assisted isolation, strict identity verification, and control-flow integrity mechanisms.
+To address C1, \kernel introduces the \emph{Shadow Ring}, a lightweight software enclave within the application process that securely isolates the trusted scheduler from untrusted application code (the tenant).
+Instead of relying on heavy-weight virtualization, \kernel constructs a secure enclave \textit{within} the process address space using Intel MPK.
+We partition the application process into two hardware-enforced domains:
+\begin{itemize}
+\item \textbf{The Tenant Ring (Untrusted):} Contains the application logic, data, and the standard userspace library OS components.
+\item \textbf{The Shadow Ring (Trusted):} Contains the \kernel scheduler (\schedcore), its private internal state, and the sensitive code paths required to interact with hardware.
+\end{itemize}
+The Shadow Ring runs at the same privilege level (Ring 3) as the application but is logically isolated by MPK permissions.
+This eliminates the costly \texttt{VMEXIT} or ring transitions for scheduler invocation, allowing \kernel to perform context switches and timer updates at near-native speeds.
 
-To address C\#1, \kernel uses Intel MPK to partition the single process address space into two hardware-enforced domains.
-The Tenant Ring contains all untrusted application code and data, as well as the normal userspace components of the library OS for system call handling and user thread management.
-The Shadow Ring contains the trusted scheduler (\schedcore), its private state, and its text segment. 
-A critical security requirement is that the \texttt{WRPKRU} instruction, which switches access to the Shadow Ring, must exist only within the verified scheduler code.
-To enforce this, the \kmod performs a \textit{load-time binary verification} during initialization. 
-It scans the loaded \texttt{.text} segment of the untrusted application binary for the opcode sequence of the \texttt{WRPKRU} instruction. 
-The verification passes only if the opcode appears exactly once at the expected offset within the secure trampoline function, confirming that no unauthorized instance has been injected. 
-Following successful attestation, the \kmod assists in configuring the MPK partition and seals it by installing a \texttt{seccomp} filter. This filter permanently revokes the \texttt{pkey\_*} system call interface, rendering the MPK domain assignment immutable and preventing a tenant from altering the memory map to gain entry.
+To address C2, \kernel implements a \emph{Double-Gate} security model that governs all interactions between the untrusted tenant, the trusted scheduler, and the kernel.
+We focus on three possible misbehaviors that could compromise system safety when exposing the LAPIC timer to userspace:
+\begin{enumerate*}[leftmargin=*,label=(\arabic*)]
+\item \textit{Illegal Entry into the Shadow Ring:} The untrusted tenant could exploit memory corruption vulnerabilities (e.g., ROP attacks) to execute the \texttt{WRPKRU} instruction and gain unauthorized access to the Shadow Ring.
+\item \textit{Unauthorized LAPIC Access:} The untrusted tenant could attempt to impose arbitrary configurations on the LAPIC timer by trapping into the kernel and forging timer requests.
+\item \textit{Preemption Bypass:} The untrusted tenant could intercept or ignore timer interrupts, preventing the scheduler from regaining control.
+\end{enumerate*}
+To mitigate these risks, \kernel employs a two-tiered gatekeeping mechanism:
+\begin{enumerate*}[leftmargin=*,label=(\roman*)]
+\item \emph{The Meso-Gate (Lateral Protection):} Enforces strict control-flow integrity to prevent the untrusted tenant from illegally entering the Shadow Ring.
+\item \emph{The Hyper-Gate (Vertical Protection):} Validates all LAPIC timer configuration requests to ensure they originate from the legitimate scheduler in the Shadow Ring.
+\end{enumerate*}
+Additionally, \kernel implements a \emph{Secure Upcall} mechanism to ensure that timer interrupts atomically redirect execution to the trusted scheduler, preventing preemption bypass.
 
-To address C\#2, \kernel introduces a Double-Gate security model to goven the interactions between the untrusted tenant, the trusted scheduler, and the kernel.
-This model ensures that while the \schedcore operates with direct hardware access, the untrusted tenant is confined to its domain, and all cross-privilege operations are authenticated and integrity-checked.
+Since this work is still in progress, we defer the detailed design and implementation of these mechanisms to future versions of this chapter.
+We introduce the first prototype of \sysname and present preliminary evaluation results in the following sections.
