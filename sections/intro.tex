@@ -8,10 +8,10 @@ In contrast, interactive applications like e-commerce and social media prioritiz
 Moreover, soft real-time workloads, including video conferencing and online gaming, operate under strict temporal constraints, demanding deadline-aware scheduling to guarantee frame rates and minimize jitter.
 
 However, enforcing application-specific scheduling policies at microsecond-scale remains to be challenging.
-Traditional kernel schedulers provides abundant scheduling policies but operate at millisecond timescales, unsuitable for modern applications.
+Traditional kernel schedulers provide abundant scheduling policies but operate at millisecond timescales, unsuitable for modern applications.
 To compensate, recent dataplane operating systems (OSes) bypass the kernel to achieve microsecond-scale preemptive scheduling in userspace.
 Yet they lack the flexibility for applications to define custom scheduling policies.
-Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workload with Processor Sharing (PS) for heavy-tailed workloads.
+Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workloads with Processor Sharing (PS) for heavy-tailed workloads.
 
 In this paper, we present the design of \kernel, a datapath OS that extends the Exokernel philosophy to hardware interrupt control.
 Our key insight is that direct userspace access to system-critical interrupt hardware is the missing piece to achieving kernel-level scheduling flexibility in current dataplane OSes.
