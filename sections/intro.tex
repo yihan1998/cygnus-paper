@@ -1,76 +1,23 @@
-Modern cloud services, including web search, online retail, and serverless platforms, operate under microsecond-scale latency Service Level Objectives (SLOs) \cite{barroso2017attack,kaffes2019shinjuku,marty2019snap,zhang2021demikernel,iyer2023achieving}.
-With every user request fanned out across thousands of servers, the end-to-end response time is determined by the slowest server.
-Therefore, to ensure a satisfactory end-to-end responsiveness, bounding tail latency at each individual server is crucial.
-These SLOs are becoming increasingly stringent, driven by the widespread deployment of ultra-low-latency hardware \yihan{cite} and the rise of microservice architectures \yihan{cite}.
+Modern datacenter applications operate under strict microsecond-scale Service Level Objectives (SLOs) while exhibiting distinct workload characteristics. 
+These workloads differ in request arrival patterns and service time distributions.
+For example, microservice often experiences high request dispersion while serverless platforms and financial trading systems often exhibit more uniform workloads yet bursty traffic patterns.
 
-Unfortunately, general-purpose operating systems (OSes) like Linux struggle to meet microsecond-scale tail latency SLOs due to unpredictable overheads in kernel I/O stack and scheduler.
-To compensate, prior systems proposed \textit{kernel bypassing} to avoid OS intervention on the datapath, introducing the concept of the \textit{dataplane OS}.
-Dataplane OSes move I/O processing to userspace and access network devices directly without involving the kernel.
-Systems such as IX~\cite{belay2014ix} use hardware virtualization features like Intel VT-d~\cite{} to achieve protected, direct NIC queue access.
-Other systems such as Shenango~\cite{} and Persephone~\cite{} rely on high-performance user-space I/O libraries such as the Data Plane Development Kit (DPDK)~\cite{}.
-For example, IX~\cite{belay2014ix} uses hardware virtualization features such as Intel VT-d~\cite{} to safely expose NIC queues to userspace.
-Other systems, like Shenango~\cite{} and Persephone~\cite{}, rely on user-space I/O libraries such as the Data Plane Development Kit (DPDK)~\cite{} to achieve similar goals.
-Additionally, dataplane OSes implement a userspace scheduler to manage lightweight user-level threads.
-IX adopts a single-threaded, run-to-completion model that reduces ring transition overhead through adaptive batching.
-In contrast, Shenango and Arachne~\cite{} use cooperative multithreading, where threads yield control explicitly to the userspace scheduler.
+The diversity in application workloads motivates the need for tailoring scheduling policies to meet specific SLOs.
+Tail latency-sensitive services, such as in-memory key-value stores and web search, benefit from preemptive scheduling to minimize queueing delays. 
+In contrast, interactive applications like e-commerce and social media prioritize responsiveness, often requiring policies like Shortest Remaining Processing Time (SRPT) to minimize mean latency.
+Moreover, soft real-time workloads, including video conferencing and online gaming, operate under strict temporal constraints, demanding deadline-aware scheduling to guarantee frame rates and minimize jitter.
 
-Yet kernel bypassing alone is insufficient, as neither run-to-completion nor cooperative scheduling can prevent head-of-line (HoL) blocking under the high-dispersion workloads common in cloud services.
-In such scenarios, a long-running task can monopolize a core, delaying the execution of short, latency-sensitive tasks and severely inflating tail latency.
-To avoid violating tail latency SLOs, dataplane OSes must support \textit{preemptive scheduling}, allowing latency-critical tasks to receive timely execution.
+However, enforcing application-specific scheduling policies at microsecond-scale remains to be challenging.
+Traditional kernel schedulers provides abundant scheduling policies but operate at millisecond timescales, unsuitable for modern applications.
+To compensate, recent dataplane operating systems (OSes) bypass the kernel to achieve microsecond-scale preemptive scheduling in userspace.
+Yet they lack the flexibility for applications to define custom scheduling policies.
+Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workload with Processor Sharing (PS) for heavy-tailed workloads.
 
-Prior work on dataplane OS has explored various mechanisms for implementing preemptive scheduling in userspace.
-% \yihan{For example, Shinjuku leverages unicast Interprocessor Interrupts (IPIs) to preempt tasks who have exhausted their 5$\mu$s timeslices.
-% Concord further reduces preemption overhead by using cooperative preemption via cache-coherent message passing \cite{iyer2023achieving}.
-% Signal?}
+In this paper, we present the design of \kernel, a datapath OS that extends the Exokernel philosophy to hardware interrupt control.
+Our key insight is that direct userspace access to system-critical interrupt hardware is the missing piece to achieving kernel-level scheduling flexibility in current dataplane OSes.
+Therefore, the goal of \kernel is to redefine the OS-application boundary to safely expose these interrupts into userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
 
-However, existing dataplane OSes typically rely on a \textit{centralized dispatcher} to preempt remote worker cores.
-As core counts grow in modern servers, the cost of issuing these preemptions through a centralized dispatcher increases proportionally, creating a fundamental scalability bottleneck.
-The system must then trade off preemption precision against resource efficiency:
-it can either reduce preemption frequency, increasing the risk of tail latency SLO violations, or dedicate more cores to dispatching, reducing resources available to applications.
-% As core counts in modern servers continue to increase, the centralized preemption dispatcher faces a fundamental scalability dilemma:
-% the cost of issuing preemptions grows with the number of cores, eventually forcing the system to choose between sacrificing preemption granularity or dedicating more cores to maintain precision.
-% This hidden scalability bottleneck limits the effectiveness of preemptive scheduling in large multi-core servers.
-% it must balance preemption precision against preemption overhead.
-% On one hand, issuing preemptions individually ensures microsecond-scale precision but incurs preemption overhead that grows linearly with core count. 
-% On the other hand, batching preemptions reduces overhead but introduces timing skew across cores, leading to inconsistent timeslicing, and potential SLO violations.
-% To mitigate this dilemma, the dataplane OS could reserve additional cores solely for preemption issuing to guarantee preemption precision.
-% This creates a compounded scalability challenge: preserving preemption precision both increases preemption overhead and reduces core efficiency.
-
-In this work, we address the scalability dilemma with \sysname, a new dataplane OS that enables distributed, microsecond-scale preemptive scheduling on multi-core servers.
-Our key insight is that modern processors already provide hardware support for fine-grained, per-core preemption through the Local Advanced Programmable Interrupt Controller (LAPIC) timer.
-However, the LAPIC timer is traditionally reserved for kernel use and is inaccessible by dataplane OS schedulers.
-This leads to the central question of our work:
-\textit{Can we safely expose kernel-critical hardware resources like the LAPIC timer to the dataplane OS scheduler?}
-
-Prior dataplane OSes have explored isolation mechanisms in userspace, but they are not designed to securely multiplex hardware resources between the kernel and a userspace scheduler.
-IX, ZygOS, and Arrakis expose I/O devices like NIC queues to applications using hardware virtualization (e.g., VT-x, IOMMU), assuming exclusive ownership and coarse-grained protection.
-Vessel uses MPK to isolate a privileged userspace scheduler from untrusted application code within the same address space, but it does not expose or protect low-level hardware resources like LAPIC timer.
-
-\sysname fills this gap by introducing privilege separation within userspace for managing kernel-critical hardware resources.
-At the core of this design is the \textit{Shadow Ring}, a lightweight software enclave that shares the same privilege level (Ring 3) as application code but is memory-isolated using MPK.
-Unlike prior systems that rely on full device ownership to userspace, \sysname enables secure multiplexing of kernel-critical hardware like the LAPIC timer to a trusted scheduler in userspace.
-Shadow Ring allows \sysname to extend the Exokernel philosophy beyond I/O devices, enabling direct, low-latency control over system-critical resources without compromising safety.
-The \sysname scheduler therefore operates across two isolated zones:
-\begin{enumerate*}[label=(\roman*)]
-  \item an untrusted zone that manages user-level threads and executes alongside application code, and
-  \item a trusted zone (\schedcore), which runs in the Shadow Ring and interacts directly with privileged hardware.
-\end{enumerate*}
-
-Although the Shadow Ring isolates trusted scheduler logic in userspace, access to system-critical hardware still requires mediation from the kernel.
-To support this, \sysname introduces a minimal kernel module (\kmod) that securely mediates access between \schedcore and hardware components such as the LAPIC timer.
-To configure a hardware resource, \schedcore can either 
-\begin{enumerate*}[label=(\arabic*)]
-  \item issue a \textit{downcall} via a system call (e.g., \texttt{ioctl()}) that traps into Ring 0, where \kmod completes hardware configuration, or
-  \item directly write to memory-mapped I/O (MMIO) regions of the hardware, which is mapped into a MPK-protected data segment in the Shadow Ring.
-\end{enumerate*}
-When a hardware event such as a timer expiration occurs, \kmod delivers it to the scheduler via an \textit{upcall}, transferring control to a registered handler located in the MPK-protected text segment in the Shadow Ring.
-
-We compare \sysname with Shinjuku~\cite{kaffes2019shinjuku}, Perséphone~\cite{demoulin2021idling} and Concord~\cite{iyer2023achieving}, three state-of-the-art dataplane operating systems.
-For synthetic workloads, we show that \yihan{xx}.
-For YCSB workloads on RocksDB, a widely used key-value store, we show that \yihan{xx}.
-We show that \sysname scales better than prior systems as core counts increase, while preserving microsecond-scale preemption precision.
-
-The rest of this paper is organized as follows.
-\S~\ref{sec:background} motivates our work by discussing the scalability challenges of existing preemptive scheduling systems.
-\S~\ref{sec:challenge} discusses the key challenges and design approaches of \sysname.
-\S~\ref{sec:design} presents the detailed design and implementation of \sysname.
+\kernel relies on three key techniques to unite the policy flexibility of kernel schedulers with the microsecond-scale performance of dataplane OSes.
+First, \kernel provides a scheduling core abstraction that enables applications to implement custom scheduling policies with kernel events in userspace.
+Second, \kernel introduces a lightweight isolation mechanism that securely exposes low-level interrupt hardware to untrusted userspace components with minimal overhead.
+Third, \kernel introduces a hardware multiplexing mechanism that safely shares system-critical resources (e.g., LAPIC timer) among multiple untrusted userspace schedulers.
