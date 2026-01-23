@@ -13,11 +13,28 @@ To compensate, recent dataplane operating systems (OSes) bypass the kernel to ac
 Yet they lack the flexibility for applications to define custom scheduling policies.
 Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workloads with Processor Sharing (PS) for heavy-tailed workloads.
 
-In this paper, we present the design of \kernel, a datapath OS that extends the Exokernel philosophy to hardware interrupt control.
-Our key insight is that direct userspace access to system-critical interrupt hardware is the missing piece to achieving kernel-level scheduling flexibility in current dataplane OSes.
-Therefore, the goal of \kernel is to redefine the OS-application boundary to safely expose these interrupts into userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
+In this paper, we present the design of \kernel, a datapath OS that extends the Exokernel philosophy to hardware interrupt control. 
+Our key insight is that the policy flexibility of kernel schedulers originates from the omniscient perception of low-level hardware events.
+The lack of such perception from userspace is the root cause of inflexible scheduling policies in existing dataplane OSes. 
+Therefore, the goal of \kernel is to safely expose low-level hardware events to userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
 
-\kernel relies on three key techniques to unite the policy flexibility of kernel schedulers with the microsecond-scale performance of dataplane OSes.
-First, \kernel provides a scheduling core abstraction that enables applications to implement custom scheduling policies with kernel events in userspace.
-Second, \kernel introduces a lightweight isolation mechanism that securely exposes low-level interrupt hardware to untrusted userspace components with minimal overhead.
-Third, \kernel introduces a hardware multiplexing mechanism that safely shares system-critical resources (e.g., LAPIC timer) among multiple untrusted userspace schedulers.
+\kernel relies on three key mechanisms to unite the policy flexibility of kernel schedulers with the microsecond-scale performance of dataplane OSes:
+First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
+The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
+These virtualized events are the primary triggers for scheduling logic, allowing the application to have direct authority over its own execution boundaries.
+Second, \kernel enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoEnvoy}, which runs inside the \textbf{Shadow Ring}. 
+The Shadow Ring is a lightweight intra-process protection domain designed as a secure environment for the direct delivery of \textit{physical} low-level hardware events. 
+MesoEnvoy consumes these events and executes application-defined scheduling policies on their behalf. 
+To prevent untrusted application code from misusing hardware events, \kernel introduces an \textbf{EntryGate} mechanism to isolate MesoEnvoy from the application. 
+EntryGate relies on hardware-enforced isolation to protect the trusted scheduler while enabling low-latency delivery of hardware events.
+Finally, \kernel introduces the Interrupt Express subsystem in the Kernel to securely multiplex low-level hardware between the MesoEnvoy and the Kernel.
+This subsystem allows the scheduler to synchronously respond to hardware events while preserving the kernel's ability to manage essential system tasks upon interruption. 
+To achieve the performance required for microsecond-scale scheduling, Interrupt Express facilitates a bidirectional fast-path for hardware interaction. 
+This path enables the direct delivery of physical interrupts to MesoEnvoy and allows the scheduler to perform immediate hardware configurations in return.
+To secure this interaction, \kernel applies a \textbf{PassthroughGate} to verify the identity of the MesoEnvoy before granting access to hardware-level operations, ensuring the kernel's functional integrity remains protected.
+
+We have implemented a prototype of \kernel called \sysname.
+To evaluate \sysname, we compare it to Shinjuku, Concord, and ghOSt on three applications with distinct scheduling policies:
+(1) a tail-latency sensitive key-value store using preemptive scheduling, 
+(2) an interactive web server employing SRPT scheduling, and 
+(3) a soft real-time video conferencing application utilizing deadline-aware scheduling.
