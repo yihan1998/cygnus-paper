@@ -1,7 +1,5 @@
 Modern datacenter applications like financial trading systems, video conferencing and social networking operate under extremely stringent, microsecond-scale Service Level Objectives (SLOs).
 Meanwhile, these applications exhibit highly diverse workload characteristics, encompassing a wide range of request arrival patterns and service time distributions.
-% These workloads differ in request arrival patterns and service time distributions.
-% For example, microservice often experiences high request dispersion while serverless platforms and financial trading systems often exhibit more uniform workloads yet bursty traffic patterns.
 
 Such diversity in workloads motivates the need to tailor scheduling policies to meet application-specific SLOs.
 % Tail latency-sensitive services, such as in-memory key-value stores and web search, benefit from preemptive scheduling to minimize queueing delays. 
@@ -13,14 +11,23 @@ However, enforcing application-specific scheduling policies at microsecond-scale
 % To compensate, recent dataplane operating systems (OSes) bypass the kernel to achieve microsecond-scale preemptive scheduling in userspace.
 % Yet they lack the flexibility for applications to define custom scheduling policies.
 % Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workloads with Processor Sharing (PS) for heavy-tailed workloads.
-
-% In this paper, we present the design of \sysname, a new dataplane OS that enables applications to define and enforce custom scheduling policies at microsecond-scale.
-% Our key insight is that a fundamental bottleneck in state-of-the-art dataplane OSes is the conflation of scheduling mechanisms with scheduling policies.
+ 
+In this paper, we present \sysname, a dataplane OS architecture that enables applications to customize microsecond-scale scheduling policies without modifying the underlying OS.
+Our key observation is that state-of-the-art dataplane OSes conflate scheduling policy and mechanism within the library OS, leaving applications with little authority over scheduling decisions in its own runtime.
+To address this limitation, \sysname decouples policy from mechanism:
+applications specify scheduling policy, and the dataplane OS enforces it efficiently and safely on bare metal at microsecond-scale.
+% Our key observation is that the rigidity in state-of-the-art dataplane OSes comes from the conflation of scheduling mechanisms with scheduling policies.
+% Building upon this observation, \sysname aims to truly decouple scheduling policies from scheduling mechanisms:
+% application developers solely define the scheduling policy whilst the dataplane OS provides the necessary mechanisms to enforce it at microsecond-scale.
 % Our key insight is that the policy flexibility of kernel schedulers originates from the omniscient perception of low-level hardware events.
 % The lack of such perception from userspace is the root cause of inflexible scheduling policies in existing dataplane OSes. 
 % Therefore, the goal of \kernel is to safely expose low-level hardware events to userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
 
-% \sysname relies on three key mechanisms to decouple scheduling policies from scheduling mechanisms 
+\sysname relies on three key mechanisms to securely delegate scheduling authority back to the application:
+First, \sysname allows applications to implement the scheduling policy in \textbf{Policy Engine}.
+Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}. 
+Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel.
+
 % First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
 % The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
 % These virtualized events are the primary triggers for scheduling logic, allowing the application to have direct authority over its own execution boundaries.

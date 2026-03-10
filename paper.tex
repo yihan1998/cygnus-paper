@@ -1,17 +1,17 @@
 %%
-%% This is file `sample-sigconf-authordraft.tex',
+%% This is file `sample-sigconf.tex',
 %% generated with the docstrip utility.
 %%
 %% The original source files were:
 %%
-%% samples.dtx  (with options: `all,proceedings,bibtex,authordraft')
+%% samples.dtx  (with options: `all,proceedings,bibtex,sigconf')
 %% 
 %% IMPORTANT NOTICE:
 %% 
 %% For the copyright see the source file.
 %% 
 %% Any modified versions of this file must be renamed
-%% with new filenames distinct from sample-sigconf-authordraft.tex.
+%% with new filenames distinct from sample-sigconf.tex.
 %% 
 %% For distribution of the original source see the terms
 %% for copying and modification in the file samples.dtx.
@@ -44,7 +44,7 @@
 %% for your publication.
 %%
 %%
-\documentclass[sigconf,authordraft]{acmart}
+\documentclass[sigconf]{acmart}
 %%
 %% \BibTeX command to typeset BibTeX logo in the docs
 \AtBeginDocument{%
@@ -104,6 +104,8 @@
 %% Uncommenting
 %% the next command will enable that style.
 %%\citestyle{acmauthoryear}
+
+\usepackage{xspace}
 
 \newcommand{\yihan}[1]{{\editorial{orange}{YIHAN: #1}}}
 \newcommand{\sysname}{\textsc{MesoKernel}\xspace}
@@ -198,7 +200,12 @@
 %% The abstract is a short summary of the work to be presented in the
 %% article.
 \begin{abstract}
-
+  % A clear and well-documented \LaTeX\ document is presented as an
+  % article formatted for publication by ACM in a conference proceedings
+  % or journal publication. Based on the ``acmart'' document class, this
+  % article presents and explains many of the common variations, as well
+  % as many of the formatting elements an author may use in the
+  % preparation of the documentation of their work.
 \end{abstract}
 
 %%
@@ -243,13 +250,6 @@
 %% A "teaser" image appears between the author and affiliation
 %% information and the body of the document, and typically spans the
 %% page.
-\begin{teaserfigure}
-  \includegraphics[width=\textwidth]{sampleteaser}
-  \caption{Seattle Mariners at Spring Training, 2010.}
-  \Description{Enjoying the baseball game from the third-base
-  seats. Ichiro Suzuki preparing to bat.}
-  \label{fig:teaser}
-\end{teaserfigure}
 
 \received{20 February 2007}
 \received[revised]{12 March 2009}
@@ -263,7 +263,6 @@
 \section{Introduction}
 \input{sections/intro.tex}
 
-% \section{Introduction}
 % ACM's consolidated article template, introduced in 2017, provides a
 % consistent \LaTeX\ style for use across ACM publications, and
 % incorporates accessibility and metadata-extraction functionality
@@ -341,7 +340,7 @@
 % This document uses the following string as the first command in the
 % source file:
 % \begin{verbatim}
-% \documentclass[sigconf,authordraft]{acmart}
+% \documentclass[sigconf]{acmart}
 % \end{verbatim}
 
 % \section{Modifications}
@@ -686,38 +685,38 @@
 % \end{verbatim}
 
 
-  % Some examples.  A paginated journal article \cite{Abril07}, an
-  % enumerated journal article \cite{Cohen07}, a reference to an entire
-  % issue \cite{JCohen96}, a monograph (whole book) \cite{Kosiur01}, a
-  % monograph/whole book in a series (see 2a in spec. document)
-  % \cite{Harel79}, a divisible-book such as an anthology or compilation
-  % \cite{Editor00} followed by the same example, however we only output
-  % the series if the volume number is given \cite{Editor00a} (so
-  % Editor00a's series should NOT be present since it has no vol. no.),
-  % a chapter in a divisible book \cite{Spector90}, a chapter in a
-  % divisible book in a series \cite{Douglass98}, a multi-volume work as
-  % book \cite{Knuth97}, a couple of articles in a proceedings (of a
-  % conference, symposium, workshop for example) (paginated proceedings
-  % article) \cite{Andler79, Hagerup1993}, a proceedings article with
-  % all possible elements \cite{Smith10}, an example of an enumerated
-  % proceedings article \cite{VanGundy07}, an informally published work
-  % \cite{Harel78}, a couple of preprints \cite{Bornmann2019,
-  %   AnzarootPBM14}, a doctoral dissertation \cite{Clarkson85}, a
-  % master's thesis: \cite{anisi03}, an online document / world wide web
-  % resource \cite{Thornburg01, Ablamowicz07, Poker06}, a video game
-  % (Case 1) \cite{Obama08} and (Case 2) \cite{Novak03} and \cite{Lee05}
-  % and (Case 3) a patent \cite{JoeScientist001}, work accepted for
-  % publication \cite{rous08}, 'YYYYb'-test for prolific author
-  % \cite{SaeediMEJ10} and \cite{SaeediJETC10}. Other cites might
-  % contain 'duplicate' DOI and URLs (some SIAM articles)
-  % \cite{Kirschmer:2010:AEI:1958016.1958018}. Boris / Barbara Beeton:
-  % multi-volume works as books \cite{MR781536} and \cite{MR781537}. A
-  % presentation~\cite{Reiser2014}. An article under
-  % review~\cite{Baggett2025}. A
-  % couple of citations with DOIs:
-  % \cite{2004:ITE:1009386.1010128,Kirschmer:2010:AEI:1958016.1958018}. Online
-  % citations: \cite{TUGInstmem, Thornburg01, CTANacmart}.
-  % Artifacts: \cite{R} and \cite{UMassCitations}.
+%   Some examples.  A paginated journal article \cite{Abril07}, an
+%   enumerated journal article \cite{Cohen07}, a reference to an entire
+%   issue \cite{JCohen96}, a monograph (whole book) \cite{Kosiur01}, a
+%   monograph/whole book in a series (see 2a in spec. document)
+%   \cite{Harel79}, a divisible-book such as an anthology or compilation
+%   \cite{Editor00} followed by the same example, however we only output
+%   the series if the volume number is given \cite{Editor00a} (so
+%   Editor00a's series should NOT be present since it has no vol. no.),
+%   a chapter in a divisible book \cite{Spector90}, a chapter in a
+%   divisible book in a series \cite{Douglass98}, a multi-volume work as
+%   book \cite{Knuth97}, a couple of articles in a proceedings (of a
+%   conference, symposium, workshop for example) (paginated proceedings
+%   article) \cite{Andler79, Hagerup1993}, a proceedings article with
+%   all possible elements \cite{Smith10}, an example of an enumerated
+%   proceedings article \cite{VanGundy07}, an informally published work
+%   \cite{Harel78}, a couple of preprints \cite{Bornmann2019,
+%     AnzarootPBM14}, a doctoral dissertation \cite{Clarkson85}, a
+%   master's thesis: \cite{anisi03}, an online document / world wide web
+%   resource \cite{Thornburg01, Ablamowicz07, Poker06}, a video game
+%   (Case 1) \cite{Obama08} and (Case 2) \cite{Novak03} and \cite{Lee05}
+%   and (Case 3) a patent \cite{JoeScientist001}, work accepted for
+%   publication \cite{rous08}, 'YYYYb'-test for prolific author
+%   \cite{SaeediMEJ10} and \cite{SaeediJETC10}. Other cites might
+%   contain 'duplicate' DOI and URLs (some SIAM articles)
+%   \cite{Kirschmer:2010:AEI:1958016.1958018}. Boris / Barbara Beeton:
+%   multi-volume works as books \cite{MR781536} and \cite{MR781537}. A
+%   presentation~\cite{Reiser2014}. An article under
+%   review~\cite{Baggett2025}. A
+%   couple of citations with DOIs:
+%   \cite{2004:ITE:1009386.1010128,Kirschmer:2010:AEI:1958016.1958018}. Online
+%   citations: \cite{TUGInstmem, Thornburg01, CTANacmart}.
+%   Artifacts: \cite{R} and \cite{UMassCitations}.
 
 % \section{Acknowledgments}
 
@@ -799,11 +798,11 @@
 % To Robert, for the bagels and explaining CMYK and color spaces.
 % \end{acks}
 
-% %%
-% %% The next two lines define the bibliography style to be used, and
-% %% the bibliography file.
-% \bibliographystyle{ACM-Reference-Format}
-% \bibliography{sample-base}
+%%
+%% The next two lines define the bibliography style to be used, and
+%% the bibliography file.
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{sample-base}
 
 
 % %%
@@ -843,4 +842,4 @@
 \end{document}
 \endinput
 %%
-%% End of file `sample-sigconf-authordraft.tex'.
+%% End of file `sample-sigconf.tex'.
