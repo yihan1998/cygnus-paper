@@ -23,7 +23,7 @@ applications specify scheduling policy, and the dataplane OS enforces it efficie
 % The lack of such perception from userspace is the root cause of inflexible scheduling policies in existing dataplane OSes. 
 % Therefore, the goal of \kernel is to safely expose low-level hardware events to userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
 
-\sysname relies on three key mechanisms to securely delegate scheduling authority back to the application:
+\sysname relies on three key mechanisms to securely delegate scheduling authority back to the application.
 First, \sysname allows applications to implement the scheduling policy in \textbf{Policy Engine}.
 Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}. 
 Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel.
