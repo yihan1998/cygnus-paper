@@ -1,40 +1,42 @@
-Modern datacenter applications operate under strict microsecond-scale Service Level Objectives (SLOs) while exhibiting distinct workload characteristics. 
-These workloads differ in request arrival patterns and service time distributions.
-For example, microservice often experiences high request dispersion while serverless platforms and financial trading systems often exhibit more uniform workloads yet bursty traffic patterns.
+Modern datacenter applications like financial trading systems, video conferencing and social networking operate under extremely stringent, microsecond-scale Service Level Objectives (SLOs).
+Meanwhile, these applications exhibit highly diverse workload characteristics, encompassing a wide range of request arrival patterns and service time distributions.
+% These workloads differ in request arrival patterns and service time distributions.
+% For example, microservice often experiences high request dispersion while serverless platforms and financial trading systems often exhibit more uniform workloads yet bursty traffic patterns.
 
-The diversity in application workloads motivates the need for tailoring scheduling policies to meet specific SLOs.
-Tail latency-sensitive services, such as in-memory key-value stores and web search, benefit from preemptive scheduling to minimize queueing delays. 
-In contrast, interactive applications like e-commerce and social media prioritize responsiveness, often requiring policies like Shortest Remaining Processing Time (SRPT) to minimize mean latency.
-Moreover, soft real-time workloads, including video conferencing and online gaming, operate under strict temporal constraints, demanding deadline-aware scheduling to guarantee frame rates and minimize jitter.
+Such diversity in workloads motivates the need to tailor scheduling policies to meet application-specific SLOs.
+% Tail latency-sensitive services, such as in-memory key-value stores and web search, benefit from preemptive scheduling to minimize queueing delays. 
+% In contrast, interactive applications like e-commerce and social media prioritize responsiveness, often requiring policies like Shortest Remaining Processing Time (SRPT) to minimize mean latency.
+% Moreover, soft real-time workloads, including video conferencing and online gaming, operate under strict temporal constraints, demanding deadline-aware scheduling to guarantee frame rates and minimize jitter.
 
 However, enforcing application-specific scheduling policies at microsecond-scale remains to be challenging.
-Traditional kernel schedulers provide abundant scheduling policies but operate at millisecond timescales, unsuitable for modern applications.
-To compensate, recent dataplane operating systems (OSes) bypass the kernel to achieve microsecond-scale preemptive scheduling in userspace.
-Yet they lack the flexibility for applications to define custom scheduling policies.
-Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workloads with Processor Sharing (PS) for heavy-tailed workloads.
+% Traditional kernel schedulers provide abundant scheduling policies but operate at millisecond timescales, unsuitable for modern applications.
+% To compensate, recent dataplane operating systems (OSes) bypass the kernel to achieve microsecond-scale preemptive scheduling in userspace.
+% Yet they lack the flexibility for applications to define custom scheduling policies.
+% Instead, they rigidly hardcode a hybrid policy by combining centralized First-Come-First-Served (FCFS) for light-tailed workloads with Processor Sharing (PS) for heavy-tailed workloads.
 
-In this paper, we present the design of \kernel, a datapath OS that extends the Exokernel philosophy to hardware interrupt control. 
-Our key insight is that the policy flexibility of kernel schedulers originates from the omniscient perception of low-level hardware events.
-The lack of such perception from userspace is the root cause of inflexible scheduling policies in existing dataplane OSes. 
-Therefore, the goal of \kernel is to safely expose low-level hardware events to userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
+% In this paper, we present the design of \sysname, a new dataplane OS that enables applications to define and enforce custom scheduling policies at microsecond-scale.
+% Our key insight is that a fundamental bottleneck in state-of-the-art dataplane OSes is the conflation of scheduling mechanisms with scheduling policies.
+% Our key insight is that the policy flexibility of kernel schedulers originates from the omniscient perception of low-level hardware events.
+% The lack of such perception from userspace is the root cause of inflexible scheduling policies in existing dataplane OSes. 
+% Therefore, the goal of \kernel is to safely expose low-level hardware events to userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
 
-\kernel relies on three key mechanisms to unite the policy flexibility of kernel schedulers with the microsecond-scale performance of dataplane OSes:
-First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
-The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
-These virtualized events are the primary triggers for scheduling logic, allowing the application to have direct authority over its own execution boundaries.
-Second, \kernel enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoEnvoy}, which runs inside the \textbf{Shadow Ring}. 
-The Shadow Ring is a lightweight intra-process protection domain designed as a secure environment for the direct delivery of \textit{physical} low-level hardware events. 
-MesoEnvoy consumes these events and executes application-defined scheduling policies on their behalf. 
-To prevent untrusted application code from misusing hardware events, \kernel introduces an \textbf{EntryGate} mechanism to isolate MesoEnvoy from the application. 
-EntryGate relies on hardware-enforced isolation to protect the trusted scheduler while enabling low-latency delivery of hardware events.
-Finally, \kernel introduces the Interrupt Express subsystem in the Kernel to securely multiplex low-level hardware between the MesoEnvoy and the Kernel.
-This subsystem allows the scheduler to synchronously respond to hardware events while preserving the kernel's ability to manage essential system tasks upon interruption. 
-To achieve the performance required for microsecond-scale scheduling, Interrupt Express facilitates a bidirectional fast-path for hardware interaction. 
-This path enables the direct delivery of physical interrupts to MesoEnvoy and allows the scheduler to perform immediate hardware configurations in return.
-To secure this interaction, \kernel applies a \textbf{PassthroughGate} to verify the identity of the MesoEnvoy before granting access to hardware-level operations, ensuring the kernel's functional integrity remains protected.
+% \sysname relies on three key mechanisms to decouple scheduling policies from scheduling mechanisms 
+% First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
+% The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
+% These virtualized events are the primary triggers for scheduling logic, allowing the application to have direct authority over its own execution boundaries.
+% Second, \kernel enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoEnvoy}, which runs inside the \textbf{Shadow Ring}. 
+% The Shadow Ring is a lightweight intra-process protection domain designed as a secure environment for the direct delivery of \textit{physical} low-level hardware events. 
+% MesoEnvoy consumes these events and executes application-defined scheduling policies on their behalf. 
+% To prevent untrusted application code from misusing hardware events, \kernel introduces an \textbf{EntryGate} mechanism to isolate MesoEnvoy from the application. 
+% EntryGate relies on hardware-enforced isolation to protect the trusted scheduler while enabling low-latency delivery of hardware events.
+% Finally, \kernel introduces the Interrupt Express subsystem in the Kernel to securely multiplex low-level hardware between the MesoEnvoy and the Kernel.
+% This subsystem allows the scheduler to synchronously respond to hardware events while preserving the kernel's ability to manage essential system tasks upon interruption. 
+% To achieve the performance required for microsecond-scale scheduling, Interrupt Express facilitates a bidirectional fast-path for hardware interaction. 
+% This path enables the direct delivery of physical interrupts to MesoEnvoy and allows the scheduler to perform immediate hardware configurations in return.
+% To secure this interaction, \kernel applies a \textbf{PassthroughGate} to verify the identity of the MesoEnvoy before granting access to hardware-level operations, ensuring the kernel's functional integrity remains protected.
 
-We have implemented a prototype of \kernel called \sysname.
-To evaluate \sysname, we compare it to Shinjuku, Concord, and ghOSt on three applications with distinct scheduling policies:
-(1) a tail-latency sensitive key-value store using preemptive scheduling, 
-(2) an interactive web server employing SRPT scheduling, and 
-(3) a soft real-time video conferencing application utilizing deadline-aware scheduling.
+% We have implemented a prototype of \kernel called \sysname.
+% To evaluate \sysname, we compare it to Shinjuku, Concord, and ghOSt on three applications with distinct scheduling policies:
+% (1) a tail-latency sensitive key-value store using preemptive scheduling, 
+% (2) an interactive web server employing SRPT scheduling, and 
+% (3) a soft real-time video conferencing application utilizing deadline-aware scheduling.
