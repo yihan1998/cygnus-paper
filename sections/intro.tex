@@ -26,7 +26,7 @@ applications specify scheduling policy, and the dataplane OS enforces it efficie
 \sysname relies on three key mechanisms to securely delegate scheduling authority back to the application.
 First, \sysname allows applications to implement the scheduling policy in \textbf{Policy Engine}.
 Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}. 
-Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel.
+Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel Scheduler.
 
 % First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
 % The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
