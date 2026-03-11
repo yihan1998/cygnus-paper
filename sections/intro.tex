@@ -9,10 +9,10 @@ Prior work~\cite{humphries2021ghost,linux-sched-ext} improves kernel scheduling 
 To avoid kernel scheduling overhead, recent research has proposed highly specialized dataplane operating systems (OSes) for microsecond-scale workloads.
 Despite their performance benefits, these systems conflate a one-size-fits-all scheduling policy deep in the runtime, making it impractical for applications to customize scheduling without modifying the underlying OS.
 
-In this paper, we present \sysname, a dataplane OS architecture that introduces programmable scheduling abstractions to decouple application-defined policies from microsecond-scale enforcement.
-Our key insight is that the rigidity in state-of-the-art dataplane OSes arises from the \textit{conflation of scheduling policies with scheduling mechanisms}.
-Thus, \sysname aims to truly decouple scheduling policies from scheduling mechanisms:
-application developers solely define the scheduling policy, while the dataplane OS provides the necessary mechanisms to enforce it at microsecond-scale.
+In this paper, we present \sysname, a dataplane OS architecture that introduces programmable scheduling abstractions for application-defined policies with microsecond-scale enforcement.
+Our key insight is that the rigidity of state-of-the-art dataplane OSes arises from \textit{conflating scheduling policy with scheduling mechanism}.
+Thus, \sysname aims to decouple these two concerns:
+application developers solely define the scheduling policy, while the dataplane OS provides the mechanisms needed to enforce it at microsecond-scale.
 
 % Our key observation is that the rigidity in state-of-the-art dataplane OSes comes from the conflation of scheduling mechanisms with scheduling policies.
 % Building upon this observation, \sysname aims to truly decouple scheduling policies from scheduling mechanisms:
