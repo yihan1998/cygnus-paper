@@ -1,12 +1,29 @@
-\subsection{Cloud Applications in the Wild}
+In this section, we provide background on the trends in cloud applications (\S\ref{sec:background-apps}) and the scheduling policies commonly used in the wild (\S\ref{sec:background-scheduling}).
+We also discuss the limitations of existing scheduling approaches and motivate the need for a new architecture that decouples scheduling policy from mechanism (\S\ref{sec:background-mechanism}).
+
+\subsection{Trends in Cloud Applications}
 \label{sec:background-apps}
 
 \yihan{Compare workload characteristics and service-level objectives of different applications, and how they are scheduled in the wild.}
 
+\subsection{Scheduling Policies in the Wild}
+\label{sec:background-scheduling}
+
+Scheduling policies have been studied extensively, with different designs targeting objectives such as fairness, throughput, and tail latency.
+Beyond these objectives, they also differ in \textit{when} scheduling decisions occur during execution.
+Following the classification in the SOAP framework~\cite{scully2018soap}, we group common scheduling policies into three classes:
+
+\emph{Non-preemptive policy} is only activated by the end of a task.
+
+\emph{Fully-preemptive policy} allows a task to be interrupted at any time.
+
+\emph{Threshold-based preemptive policy} allows a task to be interrupted at specific points.
+
 \subsection{Is Ignorance Truly Strength?}
-
-
+\label{sec:background-mechanism}
 
 \yihan{Too coarse-grained: kernel schedulers operate at millisecond timescales, unsuitable for microsecond-scale applications.}
 
 \yihan{Too rigid: dataplane OSes hardcode a hybrid policy, leaving applications with little authority over scheduling decisions.}
+
+\paragraph{State-of-the-art dataplane OSes conflate scheduling policy with mechanism at the central dispatcher.}

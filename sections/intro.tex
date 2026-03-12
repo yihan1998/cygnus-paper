@@ -7,12 +7,12 @@ However, enforcing application-specific scheduling policies at microsecond-scale
 Monolithic kernels provide only a handful of scheduling policies, prioritizing generality over per-application requirements.
 Prior work~\cite{humphries2021ghost,linux-sched-ext} improves kernel scheduling flexibility through extensible scheduling classes, but remains constrained by the kernel's millisecond-scale scheduling granularity.
 To avoid kernel scheduling overhead, recent research has proposed highly specialized dataplane operating systems (OSes) for microsecond-scale workloads.
-Despite their performance benefits, these systems conflate a one-size-fits-all scheduling policy deep in the runtime, making it impractical for applications to customize scheduling without modifying the underlying OS.
+Despite their performance benefits, these systems hardcode a one-size-fits-all scheduling policy for all workloads, making per-application customization impractical without modifying the underlying OS.
 
 In this paper, we present \sysname, a dataplane OS architecture that introduces programmable scheduling abstractions for application-defined policies with microsecond-scale enforcement.
-Our key insight is that the rigidity of state-of-the-art dataplane OSes arises from \textit{conflating scheduling policy} (i.e., the rules that determine which task should run next) \textit{with scheduling mechanism} (i.e., the implementation that enforces these rules).
+Our key insight is that the rigidity of state-of-the-art dataplane OSes arises from \textit{conflating scheduling policy with mechanism}.
 Thus, \sysname aims to decouple these two concerns:
-application developers solely define the scheduling policy, while the dataplane OS provides the mechanisms needed to enforce it at microsecond-scale.
+applications solely define the scheduling policy, while the dataplane OS provides the mechanisms needed to enforce it at microsecond-level.
 
 % Our key observation is that the rigidity in state-of-the-art dataplane OSes comes from the conflation of scheduling mechanisms with scheduling policies.
 % Building upon this observation, \sysname aims to truly decouple scheduling policies from scheduling mechanisms:
@@ -21,11 +21,19 @@ application developers solely define the scheduling policy, while the dataplane 
 % The lack of such perception from userspace is the root cause of inflexible scheduling policies in existing dataplane OSes. 
 % Therefore, the goal of \kernel is to safely expose low-level hardware events to userspace, thereby enabling applications to build custom scheduling policies directly around these low-level events.
 
-\sysname relies on three key mechanisms to securely delegate scheduling authority back to the application.
-First, \sysname provides \textbf{Policy Engine} as the primary interface for applications to define their scheduling policies.
-% The Policy Engine exposes a set of  
+% \sysname relies on three key mechanisms to empower applications to regain control over scheduling.
+% First, \sysname provides \textbf{Policy Engine} as the primary interface for applications to define their scheduling policies.
+% % The Policy Engine exposes a set of  
 % Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}. 
 % Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel Scheduler.
+
+\sysname relies on three key mechanisms to empower applications to regain control over scheduling. 
+First, \sysname provides the \textbf{Policy Engine} as the primary interface for applications to define their scheduling behavior.
+% Crucially, rather than exposing vulnerable hardware primitives like raw APIC timer or user-level Inter-Processor Interrupts (IPIs), the Policy Engine allows applications to safely express complex scheduling semantics through a secure, shared-memory dispatch descriptor.
+Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}.
+Rather than exposing vulnerable hardware primitives directly to user space, MesoCore securely parses the application's descriptor and translates these logical decisions into bare-metal actuations.
+Specifically, MesoCore programs core-local APIC timers and issues IPIs to trigger strict preemption at applications' command \yihan{too vulgaris}.
+Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between MesoCore and the Kernel Scheduler.
 
 % First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
 % The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
