@@ -10,7 +10,7 @@ To avoid kernel scheduling overhead, recent research has proposed highly special
 Despite their performance benefits, these systems hardcode a one-size-fits-all scheduling policy for all workloads, making per-application customization impractical without modifying the underlying OS.
 
 In this paper, we present \sysname, a dataplane OS architecture that introduces programmable scheduling abstractions for application-defined policies with microsecond-scale enforcement.
-Our key insight is that the rigidity of state-of-the-art dataplane OSes arises from \textit{conflating scheduling policy with mechanism}.
+Our key insight is that the rigidity of state-of-the-art dataplane OSes arises from \textit{conflating scheduling policy with enforcement}.
 Thus, \sysname aims to decouple these two concerns:
 applications solely define the scheduling policy, while the dataplane OS provides the mechanisms needed to enforce it at microsecond-level.
 
