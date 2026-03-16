@@ -9,14 +9,21 @@ We also discuss the limitations of existing scheduling approaches and motivate t
 \subsection{Scheduling Policies in the Wild}
 \label{sec:background-scheduling}
 
-Scheduling policies have been studied extensively, with different designs targeting objectives such as fairness, throughput, and tail latency.
-Beyond these objectives, they also differ in \textit{when} scheduling decisions occur during execution.
+Scheduling policies differ in two main aspects:
+whether preemption is allowed, and how the next task to run is selected.
+Based on these two dimensions, we can categorize scheduling policies into four quadrants:
+(1) non-preemptive scheduling with non-priority based selection policies (e.g., FCFS), 
+(2) non-preemptive scheduling with priority-based policies (e.g., SRPT), 
+(3) preemptive scheduling with non-priority based policies (e.g., Round Robin), and 
+(4) preemptive scheduling with priority-based policies (e.g., Earliest Deadline First).
 
-\emph{Non-preemptive policies} 
+Among these policies, non-preemptive scheduling is the easiest to implement, as it does not require the ability to interrupt a running task.
 
-\emph{Priority-based preemptive policies}
-
-\emph{Time-sharing policies} 
+Preemptive scheduling, on the other hand, requires the ability to interrupt a running task and switch to another task, which is harder to express in the scheduling policy.
+We focus on three main categories of scheduling policies in this domain:
+(1) Size-based policies, which prioritize tasks based on their expected service time (e.g., SRPT), 
+(2) Age-based policies, which prioritize tasks based on their waiting time (e.g., FCFS), and 
+(3) Deadline-based policies, which prioritize tasks based on their deadlines (e.g., EDF).
 
 \subsection{Is Ignorance Truly Strength?}
 \label{sec:background-mechanism}
