@@ -9,7 +9,17 @@ We also discuss the limitations of existing scheduling approaches and motivate t
 \subsection{Scheduling Policies in the Wild}
 \label{sec:background-scheduling}
 
-Scheduling policies differ in two main aspects:
+A \textit{scheduling policy} is an algorithm that decide which job to serve at every time in the system.
+We can classify scheduling policies into four main categories based on two dimensions:
+whether preemption is allowed, and how the next task to run is selected.
+\begin{itemize}
+    \item \textit{Non-preemptive and non-priority based} policies
+    \item \textit{Non-preemptive and priority-based} policies
+    \item \textit{Preemptive and non-priority based} policies
+    \item \textit{Preemptive and priority-based} policies
+\end{itemize}
+
+\yihan{Scheduling policies differ in two main aspects:
 whether preemption is allowed, and how the next task to run is selected.
 Based on these two dimensions, we can categorize scheduling policies into four quadrants:
 (1) non-preemptive scheduling with non-priority based selection policies (e.g., FCFS), 
@@ -23,7 +33,7 @@ Preemptive scheduling, on the other hand, requires the ability to interrupt a ru
 We focus on three main categories of scheduling policies in this domain:
 (1) Size-based policies, which prioritize tasks based on their expected service time (e.g., SRPT), 
 (2) Age-based policies, which prioritize tasks based on their waiting time (e.g., FCFS), and 
-(3) Deadline-based policies, which prioritize tasks based on their deadlines (e.g., EDF).
+(3) Deadline-based policies, which prioritize tasks based on their deadlines (e.g., EDF).}
 
 \subsection{Is Ignorance Truly Strength?}
 \label{sec:background-mechanism}
