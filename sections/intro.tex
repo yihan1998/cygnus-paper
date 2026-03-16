@@ -21,29 +21,15 @@ Such conflation leads to inflexible scheduling, as applications have no authorit
 % Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel Scheduler.
 
 \sysname relies on three key mechanisms to empower applications to regain control over scheduling. 
-% First, \sysname provides the \textbf{Policy Engine} as the primary interface for applications to define their scheduling policies.
+First, \sysname provides the \textbf{Policy Engine} as the developer-facing interface for specifying scheduling policy and intent. 
+Applications formulate scheduling policy using a \textit{rank} function, while declaring intent through SLO constraints such as tail latency or deadline.
+Second, \sysname uses the \textbf{Synthesis Engine} to aautomatically generate a scheduling implementation from the application's policy and intent specifications.
+It analyzes the rank function to determine when rescheduling should occur and maps these triggers to low-level hardware events such as I/O completions, timer expirations, or queue state changes. 
+The engine then generates a scheduling handler that recomputes priorities and selects the next task when those events occur.
+Finally, \sysname enforces the synthesized implementation through a trusted scheduler, \textbf{MesoCore}.
+MesoCore runs inside the \textbf{Shadow Ring} and interacts with low-level mechanisms required for microsecond-scale enforcement, including user interrupts and hardware timers, to prevent malicious or buggy applications from compromising the system's security and stability.
 % Crucially, rather than exposing vulnerable hardware primitives like raw APIC timer or user-level Inter-Processor Interrupts (IPIs), the Policy Engine allows applications to safely express complex scheduling semantics through a secure, shared-memory dispatch descriptor.
 % Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}.
 % Rather than exposing vulnerable hardware primitives directly to user space, MesoCore securely parses the application's descriptor and translates these logical decisions into bare-metal actuations.
 % Specifically, MesoCore programs core-local APIC timers and issues IPIs to trigger strict preemption at applications' command \yihan{too vulgaris}.
 % Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between MesoCore and the Kernel Scheduler.
-
-% First, \kernel allows applications to implement the scheduling policy in \textbf{Policy Engine}. 
-% The Policy Engine exposes a set of \textit{virtualized} low-level hardware events, such as timer interrupts, for the application to define bespoke scheduling behaviors.
-% These virtualized events are the primary triggers for scheduling logic, allowing the application to have direct authority over its own execution boundaries.
-% Second, \kernel enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoEnvoy}, which runs inside the \textbf{Shadow Ring}. 
-% The Shadow Ring is a lightweight intra-process protection domain designed as a secure environment for the direct delivery of \textit{physical} low-level hardware events. 
-% MesoEnvoy consumes these events and executes application-defined scheduling policies on their behalf. 
-% To prevent untrusted application code from misusing hardware events, \kernel introduces an \textbf{EntryGate} mechanism to isolate MesoEnvoy from the application. 
-% EntryGate relies on hardware-enforced isolation to protect the trusted scheduler while enabling low-latency delivery of hardware events.
-% Finally, \kernel introduces the Interrupt Express subsystem in the Kernel to securely multiplex low-level hardware between the MesoEnvoy and the Kernel.
-% This subsystem allows the scheduler to synchronously respond to hardware events while preserving the kernel's ability to manage essential system tasks upon interruption. 
-% To achieve the performance required for microsecond-scale scheduling, Interrupt Express facilitates a bidirectional fast-path for hardware interaction. 
-% This path enables the direct delivery of physical interrupts to MesoEnvoy and allows the scheduler to perform immediate hardware configurations in return.
-% To secure this interaction, \kernel applies a \textbf{PassthroughGate} to verify the identity of the MesoEnvoy before granting access to hardware-level operations, ensuring the kernel's functional integrity remains protected.
-
-% We have implemented a prototype of \kernel called \sysname.
-% To evaluate \sysname, we compare it to Shinjuku, Concord, and ghOSt on three applications with distinct scheduling policies:
-% (1) a tail-latency sensitive key-value store using preemptive scheduling, 
-% (2) an interactive web server employing SRPT scheduling, and 
-% (3) a soft real-time video conferencing application utilizing deadline-aware scheduling.
