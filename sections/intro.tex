@@ -20,14 +20,14 @@ Such conflation leads to inflexible scheduling, as applications have no authorit
 % Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}. 
 % Finally, \sysname introduces the \textbf{Interrupt Express} subsystem in the Kernel to securely multiplex low-level hardware between the MesoCore and the Kernel Scheduler.
 
-\sysname relies on three key mechanisms to empower applications to regain control over scheduling. 
-First, \sysname provides the \textbf{Policy Engine} as the developer-facing interface for specifying scheduling policy and intent. 
-Applications formulate scheduling policy using a \textit{rank} function, while declaring intent through SLO constraints such as tail latency or deadline.
-Second, \sysname uses the \textbf{Synthesis Engine} to aautomatically generate a scheduling implementation from the application's policy and intent specifications.
-It analyzes the rank function to determine when rescheduling should occur and maps these triggers to low-level hardware events such as I/O completions, timer expirations, or queue state changes. 
-The engine then generates a scheduling handler that recomputes priorities and selects the next task when those events occur.
-Finally, \sysname enforces the synthesized implementation through a trusted scheduler, \textbf{MesoCore}.
-MesoCore runs inside the \textbf{Shadow Ring} and interacts with low-level mechanisms required for microsecond-scale enforcement, including user interrupts and hardware timers, to prevent malicious or buggy applications from compromising the system's security and stability.
+\sysname enables application-defined scheduling through three key mechanisms.
+First, the \textbf{Policy Engine} provides a declarative interface for specifying scheduling policy and intent. 
+Applications express policies using a \textit{rank} function and specify SLOs such as tail latency or deadlines, decoupling high-level scheduling goals from their implementation.
+Second, the \textbf{Synthesis Engine} bridges this high-level specification with low-level execution. 
+It analyzes the rank function to determine when rescheduling should occur and maps these triggers to hardware events such as I/O completions, timer expirations, and queue state changes. 
+It then generates a scheduling handler that recomputes priorities and selects the next task when these events occur.
+Finally, \sysname enforces the synthesized implementation through a trusted scheduler, \textbf{MesoCore}. 
+MesoCore runs inside the \textbf{Shadow Ring} and directly interacts with low-level mechanisms such as user interrupts and hardware timers to achieve microsecond-scale enforcement, while preserving isolation from untrusted applications.
 % Crucially, rather than exposing vulnerable hardware primitives like raw APIC timer or user-level Inter-Processor Interrupts (IPIs), the Policy Engine allows applications to safely express complex scheduling semantics through a secure, shared-memory dispatch descriptor.
 % Second, \sysname enforces application-defined scheduling policies through a trusted scheduler, \textbf{MesoCore}, which runs inside the \textbf{Shadow Ring}.
 % Rather than exposing vulnerable hardware primitives directly to user space, MesoCore securely parses the application's descriptor and translates these logical decisions into bare-metal actuations.

@@ -9,51 +9,77 @@ We also discuss the limitations of existing scheduling approaches and motivate t
 \subsection{Scheduling Policies in the Wild}
 \label{sec:background-scheduling}
 
-A \textit{scheduling policy} is an algorithm that decide which task to serve at every time in the system.
-We can classify scheduling policies into four main categories based on two dimensions:
-whether preemption is allowed, and how the next task to run is selected.
+A \textit{scheduling policy} is an algorithm that decides which task to serve at every point in time. 
+We can classify scheduling policies along two orthogonal dimensions:
+whether preemption is allowed, and whether task selection is priority-based.
+%
 \begin{itemize}
-    \item \textit{Non-preemptive and non-priority based} policies (e.g., First-Come-First-Serve (FCFS)) execute tasks in the order they arrive, without allowing preemption. In this paper, we do not consider temporal information such as task arrival time as a priority attribute, and thus FCFS is categorized as non-priority based.
-    \item \textit{Non-preemptive and priority-based} policies (e.g., Shortest Job First (SJF)) select the next task to run based on a priority attribute such as expected service time, but do not allow preemption.
-    \item \textit{Preemptive and non-priority based} policies (e.g., Processor Sharing (PS)) allow preemption, but do not use any priority attribute to select the next task to run. Instead, they typically use a round-robin approach to share the processor among all tasks.
-    \item \textit{Preemptive and priority-based} policies (e.g., Shortest Remaining Processing Time (SRPT)) allow preemption and select the next task to run based on a priority attribute such as attained service time or expected remaining service time.
+    \item \textit{Non-preemptive and non-priority based} policies (e.g., First-Come-First-Served (FCFS)) execute tasks in arrival order without interruption. We do not treat temporal information such as arrival time as a priority attribute, so FCFS falls in this category.
+    \item \textit{Non-preemptive and priority-based} policies (e.g., Shortest Job First (SJF)) select the next task based on a priority attribute—such as expected service time—but never interrupt a running task.
+    \item \textit{Preemptive and non-priority based} policies (e.g., Processor Sharing (PS)) allow preemption but apply no task-level priority. Instead, they share the processor equally among all present tasks, typically via round-robin.
+    \item \textit{Preemptive and priority-based} policies (e.g., Shortest Remaining Processing Time (SRPT)) combine preemption with a dynamic priority attribute such as attained service or expected remaining service time.
 \end{itemize}
 
-Formulating a non-preemptive scheduling policy is relatively straightforward, as it does not require the ability to interrupt a running task.
+Non-preemptive policies are relatively straightforward to formulate, as scheduling decisions occur only at task completions or arrivals, with no need to interrupt ongoing execution. 
+Preemptive policies are more expressive but also more demanding: rescheduling decisions may occur mid-execution, requiring the system to maintain fine-grained task state and to define precisely \emph{when} a rescheduling event is triggered—whether by a new arrival, a timer quantum, or a change in a task's priority rank.
 
-On the contrary, formulating a preemptive scheduling policy is more challenging, as rescheduling decisions might happen during the execution of a task.
-We focus on three main categories of scheduling policies in this domain:
+We focus on three families of preemptive, priority-based policies that are prevalent in both theory and practice:
+
 \begin{itemize}
-    \item \textit{Size-based policies}, which prioritize tasks based on their expected service time, 
-    \item \textit{Age-based policies}, which prioritize tasks based on their waiting time, and 
-    \item \textit{Deadline-based policies}, which prioritize tasks based on their deadlines.
+    \item \textit{Size-based policies} assign priority according to a task's (expected) service time. Policies in this family include SRPT, which always serves the task with the shortest remaining processing time and is optimal for mean response time in the M/G/1 queue~\cite{schrage1968}, and Shortest Expected Remaining Processing Time (SERPT), which applies the same principle when exact sizes are unknown but their distribution is known~\cite{scully2020simple}.
+    \item \textit{Age-based policies} assign priority based on the attained service of each task—i.e., how long a task has already been served—without requiring any a priori knowledge of task sizes. Least Attained Service (LAS), also known as Foreground-Background (FB), always serves the task with the least attained service and is optimal for mean response time under the Decreasing Hazard Rate (DHR) service time distributions~\cite{aalto2009gittins}.
+    \item \textit{Deadline-based policies} assign priority according to temporal constraints imposed on tasks. Earliest Deadline First (EDF) always serves the task with the nearest deadline and is optimal for feasibility in preemptive real-time systems on a single processor~\cite{liu1973scheduling}.
 \end{itemize}
 
-Prior work~\cite{scully2018soap} unified some of these policies under a common framework, showing that they can be expressed as a single \textit{rank} function that assigns a priority to each task based on its attributes such as task size and age.
+These three families are not mutually exclusive: the \textit{Gittins index policy}~\cite{gittins1979bandit} subsumes all of them as special cases. Under
+specific service time distributions, Gittins reduces to SRPT (when sizes are known), to LAS (under DHR distributions), and to FCFS (under distributions that are New Better than Used in Expectation (NBUE))~\cite{aalto2009gittins}. 
+Gittins is optimal for mean response time among all non-anticipating policies in the M/G/1 queue---that is, among policies that do not know a task's remaining service time, but may use the task's age and the service time distribution.
 
-% \yihan{
-% Scheduling policies differ in two main aspects:
-% whether preemption is allowed, and how the next task to run is selected.
-% Based on these two dimensions, we can categorize scheduling policies into four quadrants:
-% (1) non-preemptive scheduling with non-priority based selection policies (e.g., FCFS), 
-% (2) non-preemptive scheduling with priority-based policies (e.g., SRPT), 
-% (3) preemptive scheduling with non-priority based policies (e.g., Round Robin), and 
-% (4) preemptive scheduling with priority-based policies (e.g., Earliest Deadline First).
+\paragraph{SOAP unifies size-based and age-based policies under a single framework}
+Prior work~\cite{scully2018soap} unified the size-based and age-based families under a single framework called \textit{SOAP} (Schedule Ordered by Age-based
+Priority). 
+A SOAP policy is fully specified by a \textit{rank function} $r(d,\, a)$, where $d$ is a task's descriptor (e.g., size class or distribution parameters) and $a$ is its attained service (age). 
+At every instant, the server runs the task of minimum rank, breaking ties by arrival order. 
+Table~\ref{tab:soap-policies} shows how canonical policies instantiate as rank functions within this framework.
 
-% Among these policies, non-preemptive scheduling is the easiest to implement, as it does not require the ability to interrupt a running task.
+\begin{table}[t]
+\centering
+\caption{Representative scheduling policies as SOAP rank functions. Here $x$
+denotes job size, $a$ denotes attained service (age), and $G(a)$ denotes the
+Gittins index at age $a$.}
+\label{tab:soap-policies}
+\begin{tabular}{lll}
+\toprule
+\textbf{Policy} & \textbf{Rank $r(d,\, a)$} & \textbf{Information required} \\
+\midrule
+FCFS            & arrival time (constant)   & None (arrival order) \\
+LAS / FB        & $a$                       & None (age only) \\
+PSJF            & $x$                       & Job size $x$ \\
+SRPT            & $x - a$                   & Job size $x$ \\
+SERPT           & $\mathbb{E}[X - a \mid X > a]$ & Size distribution \\
+Gittins         & $G(a)$                    & Size distribution \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-% Preemptive scheduling, on the other hand, requires the ability to interrupt a running task and switch to another task, which is harder to express in the scheduling policy.
-% We focus on three main categories of scheduling policies in this domain:
-% (1) Size-based policies, which prioritize tasks based on their expected service time (e.g., SRPT), 
-% (2) Age-based policies, which prioritize tasks based on their waiting time (e.g., FCFS), and 
-% (3) Deadline-based policies, which prioritize tasks based on their deadlines (e.g., EDF).
-% }
+SOAP admits a single, closed-form response time analysis that applies uniformly to all policies in the class~\cite{scully2018soap}, greatly simplifying the theoretical comparison of policies that previously required separate, ad-hoc treatments.
+
+\paragraph{SOAP excludes policies that depend on global system state.}
+Despite its generality, SOAP does not capture all scheduling policies.
+Specifically, SOAP requires that a task's priority depend only on its own descriptor and age, independently of other tasks in the system. 
+This excludes \textit{Processor Sharing} (PS), whose effective service rate depends on the instantaneous number of tasks present, and \textit{Nudge}~\cite{grosof2021nudge}, whose priority rule explicitly compares pairs of tasks. 
+More broadly, any policy whose rank function depends on global system state—queue length, other tasks' sizes, or resource packing constraints—falls outside the SOAP class. 
+Extensions such as WCFS~\cite{grosof2022wcfs} address the multiserver and capacity-sharing cases, while the MDP formulation~\cite{puterman1994mdp} provides a universal-but-unstructured representation that subsumes all policies at the cost of analytical tractability.
 
 \subsection{Is Ignorance Truly Strength?}
 \label{sec:background-mechanism}
 
 \yihan{Too coarse-grained: kernel schedulers operate at millisecond timescales, unsuitable for microsecond-scale applications.}
 
+\paragraph{Traditional kernel schedulers have coarse-grained intent, yet operate at millisecond timescales}
+
+\paragraph{Programmable kernel schedulers improve policy flexibility but cannot escape kernel granularity constraints}
+
 \yihan{Too rigid: dataplane OSes hardcode a hybrid policy, leaving applications with little authority over scheduling decisions.}
 
-\paragraph{State-of-the-art dataplane OSes conflate scheduling policy with mechanism at the central dispatcher.}
+\paragraph{Existing dataplane OSes conflate scheduling policy, intent, and enforcement}
