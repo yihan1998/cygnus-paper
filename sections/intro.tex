@@ -2,7 +2,7 @@ Scheduling plays a central role in meeting the diverse Service Level Objectives 
 
 Achieving these SLOs requires both a \textit{scheduling policy}, which determines how tasks are ordered, and a specification of \textit{intent}, which captures the SLOs the scheduler is expected to satisfy.
 
-However, translating policy and intent onto low-level scheduling mechanisms, such as timers and I/O events, to produce a correct scheduling implementation remains laborious.
+However, translating policy and intent onto low-level scheduling mechanisms, such as timers and I/O events, to produce a correct scheduler remains laborious.
 
 Prior work has proposed efficient scheduling frameworks that simplify policy deployment~\cite{humphries2021ghost, linux-sched-ext}, but still requires developers to manually bridge the implementation gap between high-level policy and intent and low-level mechanisms.
 
